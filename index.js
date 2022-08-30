@@ -14,6 +14,7 @@ const { circularDeepEqual } = require('fast-equals');
 const { cruise } = require("dependency-cruiser");
 const { inspect } = require('util');
 const { terminalCodesToHtml } = require("terminal-codes-to-html");
+const _ = require('underscore');
 
 const IGNORED_STACK_SOURCES = [
 	'node_modules',
@@ -129,7 +130,8 @@ function wrapHandler(method, handler) {
 		'^next$',
 		'^req$',
 		'^res$',
-		'^socket$'
+		'^socket$',
+		'^sessionStore$'
 	].map(s => new RegExp(s));
 
 	if ("function" !== typeof handler) {
@@ -251,8 +253,8 @@ function wrapHandler(method, handler) {
 					ignored = callback(request, handler) || ignoredMiddlewares.some(regex => regex.test(handler.name));
 					if (ignored) return next();
 
-					//originals.request = cloneButIgnore(request, ignoredProperties);
-					//originals.response = cloneButIgnore(response, ignoredProperties);
+					originals.request = cloneButIgnore(request, ignoredProperties);
+					originals.response = cloneButIgnore(response, ignoredProperties);
 					next(error);
 				},
 				after(error, request, response, next, paramValue, realEnd) {
@@ -295,7 +297,7 @@ function wrapHandler(method, handler) {
 					}*/
 					let requestDiff = '';
 					try {
-						/*
+						
 						requestDiff = diff(
 							originals.request,
 							cloneButIgnore(request, ignoredProperties),
@@ -310,13 +312,12 @@ function wrapHandler(method, handler) {
 								contextLines: 0,
 								includeChangeCounts: true
 							}
-						).replace(/@@.*?@@\n/g, '')*/
+						).replace(/@@.*?@@\n/g, '')
 					} catch (e) {
 						requestDiff = 'Unable to inspect'
 					}
 					let responseDiff = '';
 					try {
-						/*
 						responseDiff = diff(
 							originals.response,
 							cloneButIgnore(response, ignoredProperties),
@@ -331,7 +332,7 @@ function wrapHandler(method, handler) {
 								contextLines: 0,
 								includeChangeCounts: true
 							}
-						).replace(/@@.*?@@\n/g, '')*/
+						).replace(/@@.*?@@\n/g, '')
 					} catch (e) {
 						responseDiff = 'Unable to inspect'
 					}

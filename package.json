@@ -19,9 +19,11 @@
     "flatted": "^3.2.7",
     "func-loc": "^0.1.16",
     "jest-diff": "^29.0.1",
+    "lodash.clonedeep": "^4.5.0",
     "lodash.flattendeep": "^4.4.0",
     "pretty": "^2.0.0",
     "recursive-diff": "^1.0.8",
-    "terminal-codes-to-html": "^0.0.1"
+    "terminal-codes-to-html": "^0.0.1",
+    "underscore": "^1.13.4"
   }
 }
