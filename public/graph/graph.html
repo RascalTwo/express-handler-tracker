@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Express Handler Tracker - Request Network Graph</title>
+
+		<link rel="stylesheet" href="../paper.min.css" />
+
+		<script src="../flatted.min.js"></script>
+		<script src="cytoscape.min.js"></script>
+
+		<script src="cola.js"></script>
+		<script src="cytoscape-cola.js"></script>
+
+		<script src="dagre.min.js"></script>
+		<script src="cytoscape-dagre.js"></script>
+
+		<script src="cytoscape-euler.js"></script>
+
+		<script src="klay.js"></script>
+		<script src="cytoscape-klay.js"></script>
+
+		<script src="elk.bundled.js"></script>
+		<script src="cytoscape-elk.js"></script>
+
+		<script src="popper.min.js"></script>
+		<script src="tippy-bundle.umd.js"></script>
+		<script src="cytoscape-popper.js"></script>
+
+		<script src="cytoscape-layers.js"></script>
+		<script src="cyroscape-bubblesets.js"></script>
+
+		<link rel="stylesheet" href="window-engine.css">
+
+		<script src="escape-html.js"></script>
+
+		<script src="highlight.min.js"></script>
+		<link rel="stylesheet" href="github-dark.min.css" />
+		<link href="graph.css" rel="stylesheet" />
+	</head>
+
+	<body>
+		<div id="cy"></div>
+
+		<span id="tooltippy"></span>
+
+		<div class="windowGroup">
+			<div id="window1" class="window data fade small">
+				<div class="purple">
+					<p class="windowTitle">Request</p>
+				</div>
+				<div class="mainWindow">
+					<pre></pre>
+				</div>
+			</div>
+			<div id="window2" class="window data fade small">
+				<div class="cyan">
+					<p class="windowTitle">Response</p>
+				</div>
+				<div class="mainWindow">
+					<pre></pre>
+				</div>
+			</div>
+			<div id="window3" class="window fade small">
+				<div class="cyan">
+					<p class="windowTitle">Layout</p>
+				</div>
+				<div class="mainWindow">
+					<div class="content-wrapper">
+						<label for="layout-options">Placement Algorithm</label>
+						<div class="form-group"><select id="layout-options"></select></div>
+
+						<span class="form-group">
+							<label for="groups" class="paper-switch-tile">
+								<input id="groups" type="checkbox" checked />
+								<div class="paper-switch-tile-card border">
+									<div class="paper-switch-tile-card-front border">Groups</div>
+									<div class="paper-switch-tile-card-back border background-primary">Bubbles</div>
+								</div>
+							</label>
+						</span>
+						<span></span>
+						<label for="animation-duration">Animation Duration (ms)</label>
+						<div class="form-group"><input type="range" id="animation-duration" min="0" max="2000" step="100"
+								value="1000"></div>
+						<label>Layout</label>
+							<div>
+							<button id="save">Save</button>
+							<button id="restore">Restore</button>
+						</div>
+						<label>Everything</label>
+						<div>
+							<button id="export">Export</button>
+							<button id="import">Import</button>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div id="window4" class="window fade small">
+				<div class="cyan">
+					<p class="windowTitle">Requests</p>
+				</div>
+				<div class="mainWindow">
+					<div class="content-wrapper">
+						<label for="requests">Request</label><select id="requests"></select>
+
+						<label id="event-small"></label>
+						<select id="events" multiple>Events</select>
+					</div>
+				</div>
+			</div>
+		</div>
+
+
+		<details>
+			<summary>Windows</summary>
+
+			<button id="button3">Layout</button>
+			<button id="button4">Requests</button>
+			<button id="button1">Request Inspector</button>
+			<button id="button2">Response Inspector</button>
+			<button id="reset-windows">Reset</button>
+		</details>
+
+		<input class="modal-state" id="modal-1" type="checkbox">
+		<div class="modal">
+			<label class="modal-bg" for="modal-1"></label>
+			<div class="modal-body">
+				<label class="btn-close" for="modal-1">X</label>
+				<h4 class="modal-title">Import Data</h4>
+				<input type="file" id="import-file" />
+				<textarea id="import-text"></textarea>
+				<label for="modal-1">Import</label>
+			</div>
+		</div>
+
+		<span id="connection-indicator"></span>
+
+		<script src="window-engine.js"></script>
+		<script src="graph.js" type="module"></script>
+	</body>
+
+</html>
