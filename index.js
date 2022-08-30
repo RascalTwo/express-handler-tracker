@@ -251,8 +251,8 @@ function wrapHandler(method, handler) {
 					ignored = callback(request, handler) || ignoredMiddlewares.some(regex => regex.test(handler.name));
 					if (ignored) return next();
 
-					originals.request = cloneButIgnore(request, ignoredProperties);
-					originals.response = cloneButIgnore(response, ignoredProperties);
+					//originals.request = cloneButIgnore(request, ignoredProperties);
+					//originals.response = cloneButIgnore(response, ignoredProperties);
 					next(error);
 				},
 				after(error, request, response, next, paramValue, realEnd) {
@@ -293,8 +293,9 @@ function wrapHandler(method, handler) {
 					} catch (e) {
 						responseDiff = {};
 					}*/
-					let requestDiff;
+					let requestDiff = '';
 					try {
+						/*
 						requestDiff = diff(
 							originals.request,
 							cloneButIgnore(request, ignoredProperties),
@@ -309,12 +310,13 @@ function wrapHandler(method, handler) {
 								contextLines: 0,
 								includeChangeCounts: true
 							}
-						).replace(/@@.*?@@\n/g, '')
+						).replace(/@@.*?@@\n/g, '')*/
 					} catch (e) {
 						requestDiff = 'Unable to inspect'
 					}
-					let responseDiff;
+					let responseDiff = '';
 					try {
+						/*
 						responseDiff = diff(
 							originals.response,
 							cloneButIgnore(response, ignoredProperties),
@@ -329,13 +331,13 @@ function wrapHandler(method, handler) {
 								contextLines: 0,
 								includeChangeCounts: true
 							}
-						).replace(/@@.*?@@\n/g, '')
+						).replace(/@@.*?@@\n/g, '')*/
 					} catch (e) {
 						responseDiff = 'Unable to inspect'
 					}
 
-					if (Object.keys(requestDiff).length) debug(`request: ${Object.keys(requestDiff).reduce((string, key) => `${string}\n  ${key}: ${util.inspect(requestDiff[key].before, { depth: 1, colors: true, }).replace(/\n/g, '\n  ')} -> ${util.inspect(requestDiff[key].after, { depth: 1, colors: true, }).replace(/\n/g, '\n  ')}`, '')}`);
-					if (Object.keys(responseDiff).length) debug(`response: ${Object.keys(responseDiff).reduce((string, key) => `${string}\n  ${key}: ${util.inspect(responseDiff[key].before, { depth: 1, colors: true, }).replace(/\n/g, '\n  ')} -> ${util.inspect(responseDiff[key].after, { depth: 1, colors: true, }).replace(/\n/g, '\n  ')}`, '')}`);
+					//if (Object.keys(requestDiff).length) debug(`request: ${Object.keys(requestDiff).reduce((string, key) => `${string}\n  ${key}: ${util.inspect(requestDiff[key].before, { depth: 1, colors: true, }).replace(/\n/g, '\n  ')} -> ${util.inspect(requestDiff[key].after, { depth: 1, colors: true, }).replace(/\n/g, '\n  ')}`, '')}`);
+					//if (Object.keys(responseDiff).length) debug(`response: ${Object.keys(responseDiff).reduce((string, key) => `${string}\n  ${key}: ${util.inspect(responseDiff[key].before, { depth: 1, colors: true, }).replace(/\n/g, '\n  ')} -> ${util.inspect(responseDiff[key].after, { depth: 1, colors: true, }).replace(/\n/g, '\n  ')}`, '')}`);
 
 					addRequestData(request, {
 						start,

@@ -4,21 +4,21 @@
 
 Tracks activities your Express application does - middlewares, responses, etc - allowing you to visualize all of these events and changes in a network graph, for both debugging and architectural understanding.
 
-> despite being able to collect a large deal of information statically, this is not a static-analysis tool, views for example need to be evaluated in order to be rendered.
+> Despite being able to collect a large deal of information statically, this is not a static-analysis tool, views for example need to be evaluated in order to be rendered.
 
 ## Installation
 
 After installing the package:
 
 ```shell
-npm install @rascal_two/express-handler-tracker
+npm install https://github.com/RascalTwo/expess-handler-tracker
 ```
 
 Your Express application & any routers must be instrumented, currently this must be done manually:
 
 ```javascript
-const app = require('express-handler-tracker')(express(), { main: 'index.js', port: 1234 })
-const router = require('express-handler-tracker')(express.Router());
+const app = require('@rascal_two/express-handler-tracker')(express(), { main: 'index.js', port: 1234 })
+const router = require('@rascal_two/express-handler-tracker')(express.Router());
 ```
 
 This instrumentation method takes a few options:
