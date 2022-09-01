@@ -21,12 +21,23 @@ const app = require('@rascal_two/express-handler-tracker')(express(), { main: 'i
 const router = require('@rascal_two/express-handler-tracker')(express.Router());
 ```
 
-This instrumentation method takes a few options:
+This instrumentation method takes various:
 
 ```javascript
 {
   main: 'filepath to the entry point JavaScript file',
-  port: 1234 // Port to start frontend server on, EHT server will not start without
+}
+```
+
+Additionally there are optional properties that can be used:
+
+```javascript
+{
+  port: 1234 // Port to start frontend server on, EHT server will not automatically start without,
+  diffExcludedProperties: ['array', 'of', 'regular', 'expression', 'strings', 'of', 'root', 'properties', 'to', 'ignore']
+  /*
+  which defaults to [ '^__r2', '^client$', '^_readableState$', '^next$', '^req$', '^res$', '^socket$', '^host$', '^sessionStore$']
+  */
 }
 ```
 
@@ -60,6 +71,13 @@ app.use(middlewareFunction);
 app = require('@rascal_two/express-handler-tracker')(app, { main: 'index.js' });
 // Will not be able to track `middlewareFunction`
 ```
+
+## Troubleshooting
+
+If you find requests take a long time, the most likely cause is that something large has been stringified during diffing, the solution is to wait for it to complete and then locate the middleware that has taken the longest time. 
+Then select it and manually inspect it to see which base property contains the most text.
+
+Once located, adding this to your own `diffExcludedProperties` will resolve the issue.
 
 ### Usage
 

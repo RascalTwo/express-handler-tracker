@@ -33,7 +33,10 @@ function createWindow(id) {
         fadeOut(windowID);
     };
     document.getElementById("button" + id).onclick = function () {
-        if (windowID.style.display === "initial") {
+        const opening = windowID.style.display !== "initial";
+        this.classList.toggle('btn-success', opening);
+        if (!opening) {
+            this.classList.remove('btn-secondary');
 			fadeOut(windowID);
         } else {
             fadeIn(windowID);
@@ -147,4 +150,6 @@ function activeWindow(elmnt) {
         active[i].classList.remove("windowActive");
         elmnt.className += " windowActive";
     }
+    document.querySelectorAll('[id^="button"]').forEach(b => b.classList.remove('btn-secondary'))
+    document.querySelector(`#button${elmnt.id.split('window')[1]}`).classList.add('btn-secondary')
 }

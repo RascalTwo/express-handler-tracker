@@ -38,27 +38,31 @@
 
 		<script src="highlight.min.js"></script>
 		<link rel="stylesheet" href="github-dark.min.css" />
+		<script
+			src="//cdnjs.cloudflare.com/ajax/libs/highlightjs-line-numbers.js/2.8.0/highlightjs-line-numbers.min.js"></script>
 		<link href="graph.css" rel="stylesheet" />
 	</head>
 
 	<body>
-		<div id="cy"></div>
+		<div id="cy-div"></div>
 
 		<span id="tooltippy"></span>
 
 		<div class="windowGroup">
-			<div id="window1" class="window data fade small">
+			<div id="window1" class="window data black fade small">
 				<div class="purple">
 					<p class="windowTitle">Request</p>
 				</div>
+				<br /><br />
 				<div class="mainWindow">
 					<pre></pre>
 				</div>
 			</div>
-			<div id="window2" class="window data fade small">
+			<div id="window2" class="window data black fade small">
 				<div class="cyan">
 					<p class="windowTitle">Response</p>
 				</div>
+				<br /><br />
 				<div class="mainWindow">
 					<pre></pre>
 				</div>
@@ -67,26 +71,48 @@
 				<div class="cyan">
 					<p class="windowTitle">Layout</p>
 				</div>
+				<br /><br />
 				<div class="mainWindow">
 					<div class="content-wrapper">
 						<label for="layout-options">Placement Algorithm</label>
 						<div class="form-group"><select id="layout-options"></select></div>
-
-						<span class="form-group">
-							<label for="groups" class="paper-switch-tile">
-								<input id="groups" type="checkbox" checked />
-								<div class="paper-switch-tile-card border">
-									<div class="paper-switch-tile-card-front border">Groups</div>
-									<div class="paper-switch-tile-card-back border background-primary">Bubbles</div>
-								</div>
-							</label>
-						</span>
-						<span></span>
+						<div class="toggles-wrapper">
+							<span class="form-group">
+								<label for="groups" class="paper-switch-tile">
+									<input id="groups" type="checkbox" checked />
+									<div class="paper-switch-tile-card border">
+										<div class="paper-switch-tile-card-front border">Bubbles</div>
+										<div class="paper-switch-tile-card-back border background-primary">Groups</div>
+									</div>
+								</label>
+							</span>
+							Edges
+							<span class="form-group">
+								<label for="allEdges" class="paper-switch-tile">
+									<input id="allEdges" type="checkbox" checked />
+									<div class="paper-switch-tile-card border">
+										<div class="paper-switch-tile-card-front border">Request</div>
+										<div class="paper-switch-tile-card-back border background-primary">All</div>
+									</div>
+								</label>
+							</span>
+							Theme
+							<span class="form-group">
+								<label for="darkTheme" class="paper-switch-tile">
+									<input id="darkTheme" type="checkbox" checked />
+									<div class="paper-switch-tile-card border">
+										<div class="paper-switch-tile-card-front border">Light</div>
+										<div class="paper-switch-tile-card-back border background-primary">Dark</div>
+									</div>
+								</label>
+							</span>
+						</div>
 						<label for="animation-duration">Animation Duration (ms)</label>
 						<div class="form-group"><input type="range" id="animation-duration" min="0" max="2000" step="100"
 								value="1000"></div>
-						<label>Layout</label>
-							<div>
+						
+						<!--<label>Layout</label>
+						<div>
 							<button id="save">Save</button>
 							<button id="restore">Restore</button>
 						</div>
@@ -94,6 +120,22 @@
 						<div>
 							<button id="export">Export</button>
 							<button id="import">Import</button>
+						</div>-->
+						<div class="style-rules-wrapper">
+							<button id="add-rule">Add Style Rule</button>
+							<button id="reset-rules">Reset All Rules</button>
+							<table>
+								<thead>
+									<tr>
+										<th>Pattern</th>
+										<th>Color</th>
+										<th>Shape</th>
+										<th>Actions</th>
+									</tr>
+								</thead>
+								<tbody>
+								</tbody>
+							</table>
 						</div>
 					</div>
 				</div>
@@ -102,6 +144,7 @@
 				<div class="cyan">
 					<p class="windowTitle">Requests</p>
 				</div>
+				<br /><br />
 				<div class="mainWindow">
 					<div class="content-wrapper">
 						<label for="requests">Request</label><select id="requests"></select>
@@ -111,18 +154,37 @@
 					</div>
 				</div>
 			</div>
+			<div id="window5" class="window fade black small">
+				<div class="cyan">
+					<p class="windowTitle">Current Code</p>
+				</div>
+				<br /><br />
+				<div class="mainWindow">
+					<pre></pre>
+				</div>
+			</div>
+			<div id="window6" class="window fade black small">
+				<div class="cyan">
+					<p class="windowTitle">All Code</p>
+				</div>
+				<br /><br />
+				<div class="mainWindow">
+					<pre></pre>
+				</div>
+			</div>
 		</div>
 
 
-		<details>
-			<summary>Windows</summary>
-
+		<footer>
 			<button id="button3">Layout</button>
 			<button id="button4">Requests</button>
 			<button id="button1">Request Inspector</button>
 			<button id="button2">Response Inspector</button>
-			<button id="reset-windows">Reset</button>
-		</details>
+			<button id="button5">Current Code</button>
+			<button id="button6">All Code</button>
+			<button id="reset-windows">Reset Windows</button>
+			<button id="reset-all">Reset All</button>
+		</footer>
 
 		<input class="modal-state" id="modal-1" type="checkbox">
 		<div class="modal">

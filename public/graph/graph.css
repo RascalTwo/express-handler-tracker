@@ -3,26 +3,14 @@ body {
 	overflow: hidden;
 }
 
-#cy {
+html.dark {
+	background-color: #41403e;
+	color: white;
+}
+
+#cy-div {
 	width: 100vw;
 	height: 100vh;
-}
-
-details {
-	position: absolute;
-	z-index: 150;
-	left: 0;
-	top: 0;
-	height: max-content;
-}
-
-summary {
-	cursor: pointer;
-	z-index: 150;
-	position: relative;
-	background: white;
-	border-radius: 1rem;
-	width: max-content;
 }
 
 pre {
@@ -50,7 +38,15 @@ pre {
 	overflow: scroll;
 }
 
-.window.data {
+html.dark .window {
+	background-color: black;
+}
+
+html.dark .background-primary {
+	background-color: #41403e;
+}
+
+.window.black {
 	background-color: black;
 }
 
@@ -64,17 +60,14 @@ pre {
 	height: 100%;
 }
 
-details {
-	position: absolute;
-	top: 0;
-	left: 0;
-	width: max-content;
+summary {
+	text-align: end;
 }
 
-.tabs {
-	border: 1px solid black;
-	background-color: rgba(255, 255, 255, 0.9);
+details > a {
+	float: right;
 }
+
 
 .content-wrapper {
 	display: grid;
@@ -146,4 +139,81 @@ option:checked {
 
 #connection-indicator[data-ready-state="2"]{
 	background-color: red;
+}
+
+.hljs-ln tbody tr:first-child {
+	filter: brightness(62.5%);
+}
+.hljs-ln tbody tr:last-child {
+	filter: brightness(62.5%);
+}
+
+table tbody tr td {
+	border: none;
+}
+
+footer {
+	position: absolute;
+	left: 0;
+	bottom: 0;
+	z-index: 1000;
+	background-color: white;
+	width: 100%;
+	right: 0;
+	padding: 0.1rem;
+	border-top: 1px solid grey;
+}
+
+html.dark footer {
+	background-color: #41403e;
+	border-top-color: white;
+}
+
+html.dark .btn-success, html.dark .btn-secondary {
+	color: white !important;
+}
+
+footer > button {
+	padding: 0.1rem;
+}
+
+footer > button:last-child {
+	float: right;
+}
+
+footer > button:nth-last-child(2) {
+	float: right;
+}
+
+.btn-secondary.btn-success {
+	color: var(--secondary-text);
+	background-color: var(--secondary-light);
+	border-color: var(--secondary);
+}
+
+summary > button {
+	padding: 0.1rem;
+}
+
+.highlighted-event {
+	border: 1px dashed white;
+}
+
+.window > [id$="header"] {
+	position: fixed;
+	width: inherit;
+}
+
+.toggles-wrapper {
+	grid-column: 1 / 3;
+	align-items: center;
+}
+
+.toggles-wrapper > .form-group {
+	margin-bottom: 0;
+}
+
+.style-rules-wrapper {
+	grid-column: 1 / 3;
+	display: block !important;
 }

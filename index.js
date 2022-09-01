@@ -1,20 +1,18 @@
 
 
+const fs = require('fs')
 const util = require('util');
 const path = require('path');
+const { cruise } = require("dependency-cruiser");
+const { locate } = require('func-loc');
 const { diff } = require('jest-diff');
-const debug = require('debug')('express-handler-tracker');
+const { terminalCodesToHtml } = require("terminal-codes-to-html");
+const underscore = require('underscore');
+
 const flattenDeep = require("lodash.flattendeep");
 const express = require('express');
 const cors = require('cors');
-const { locate } = require('func-loc');
 const Flatted = require('flatted');
-const clone = require('clone');
-const { circularDeepEqual } = require('fast-equals');
-const { cruise } = require("dependency-cruiser");
-const { inspect } = require('util');
-const { terminalCodesToHtml } = require("terminal-codes-to-html");
-const _ = require('underscore');
 
 const IGNORED_STACK_SOURCES = [
 	'node_modules',
@@ -25,6 +23,19 @@ const IGNORED_STACK_SOURCES = [
 ]
 
 Error.stackTraceLimit = 1000;
+
+
+let diffExcludedProperties = [
+	'^__r2',
+	'^client$',
+	'^_readableState$',
+	'^next$',
+	'^req$',
+	'^res$',
+	'^socket$',
+	'^host$',
+	'^sessionStore$'
+].map(s => new RegExp(s));
 
 let mainFilepath;
 const sseClients = [];
@@ -44,6 +55,43 @@ function getProjectLines(error) {
 
 const requests = new Map();
 
+function getLinesFromPath(path) {
+	const filepath = path.split(':').slice(0, -2).join(':')
+	const [lines, col] = path.split(':').slice(-2);
+	const [start, end = start + 1] = lines.split('-').map(Number);
+	return fs.readFileSync(filepath).toString().split('\n').slice(Math.max(0, start - 2), end);
+}
+
+function replaceHandler(handler) {
+	const location = fnLocations.get(handler)
+	const obj = {
+		name: handler.name,
+		adds: handler.__r2_add_lines,
+		construct: handler.__r2_construct_lines,
+		location,
+		code: {
+			adds: handler.__r2_add_lines?.length ? getLinesFromPath(handler.__r2_add_lines[0][0]) : undefined,
+			construct: handler.__r2_construct_lines ? getLinesFromPath(handler.__r2_construct_lines[0]) : undefined,
+			location: getLinesFromPath(`${location.path}:${location.line}-${location.line + handler.toString().split('\n').length}:${location.column}`),
+		}
+	};
+	if (IGNORED_STACK_SOURCES.some(ignore => obj.location?.path.includes(ignore))) {
+		delete obj.location;
+		delete obj.code.location;
+	}
+
+	if (!Object.values(obj.code).filter(Boolean).length) delete obj.code;
+	return obj;
+}
+
+function getEvaluateInfo() {
+	const lines = getProjectLines();
+	return {
+		lines,
+		code: getLinesFromPath(lines[0])
+	}
+}
+
 async function normalizeEvent(event) {
 	if (typeof event.handler === 'function') {
 
@@ -52,15 +100,7 @@ async function normalizeEvent(event) {
 	}
 
 
-	if (event.handler) {
-		event.handler = {
-			name: event.handler.name,
-			adds: event.handler.__r2_add_lines,
-			construct: event.handler.__r2_construct_lines,
-			location: fnLocations.get(event.handler),
-		}
-		if (IGNORED_STACK_SOURCES.some(ignore => event.handler.location?.path.includes(ignore))) delete event.handler.location;
-	}
+	if (event.handler) event.handler = replaceHandler(event.handler)
 	return event
 }
 
@@ -81,7 +121,7 @@ const backflow = [];
 			if (!info) continue;
 			if (!(chunk.id in newRequests)) newRequests[chunk.id] = { start: info.start, events: [] };
 			newRequests[chunk.id].events.push(chunk.event);
-			newRequests[chunk.id].events.sort((a, b) => a.start - b.start);
+			newRequests[chunk.id].events.sort((a, b) => a.start - b.start) || a.order - b.order;
 		}
 
 		const json = Flatted.stringify(newRequests);
@@ -92,9 +132,9 @@ const backflow = [];
 function addRequestData(request, data) {
 	const info = requests.get(request.__r2_id);
 	if (!info) return;
-	info.events.push(data);
-	info.events.sort((a, b) => a.start - b.start);
-	//info.end = { request, response: request.res }
+	info.events.push({ ...data, order: info.events.length });
+	info.events.sort((a, b) => a.start - b.start || a.order - b.order);
+	info.end = { request: cloneButIgnore(request, diffExcludedProperties), response: cloneButIgnore(request.res, diffExcludedProperties) }
 
 	if (!sseClients.length) return;
 	backflow.push({ id: request.__r2_id, event: data });
@@ -105,15 +145,17 @@ function cloneButIgnore(obj, ignoredProperties, ...args) {
 	for (const key in obj) {
 		if (!ignoredProperties.some(regex => regex.test(key))) shallow[key] = obj[key];
 	}
-	return clone(shallow, ...args);
+	return underscore.clone(shallow, ...args);
 }
 
 
 function errorToInfo(error) {
 	if (!error) return undefined;
+	const lines = getProjectLines(error)
 	return {
 		stack: error.stack,
-		lines: getProjectLines(error)
+		lines,
+		code: getLinesFromPath(lines[0])
 	}
 }
 
@@ -121,18 +163,6 @@ function wrapHandler(method, handler) {
 	if (handler.name === 'router' && !('__r2_construct_lines' in handler)) {
 		console.error('un-instrumented router found:', getProjectLines()[0]);
 	}
-	callback = () => false;
-	ignoredMiddlewares = [];
-	ignoredProperties = [
-		'^__r2',
-		'^client$',
-		'^_readableState$',
-		'^next$',
-		'^req$',
-		'^res$',
-		'^socket$',
-		'^sessionStore$'
-	].map(s => new RegExp(s));
 
 	if ("function" !== typeof handler) {
 		throw new Error("Expected a callback function but got a " + Object.prototype.toString.call(handler));
@@ -152,24 +182,59 @@ function wrapHandler(method, handler) {
 
 		const { before, after } = (() => {
 			let originals = {};
-			let ignored = false;
 
 			return {
 				before(error, request, response, next, paramValue) {
 					if (!('__r2_id' in request)) {
 						request.__r2_id = request.headers['x-r2-id'] || Date.now();
 						requests.set(request.__r2_id, {
-							/*start: { request: cloneButIgnore(request, ignoredProperties), response: cloneButIgnore(response, ignoredProperties) },*/
+							start: { request: cloneButIgnore(request, diffExcludedProperties), response: cloneButIgnore(response, diffExcludedProperties) },
 							events: [],
-							start: { request: { url: request.url, method: request.method } }
 						})
-						/*request = ObservableSlim.create(request, true, function(changes) {
-							console.log('request', JSON.stringify(changes));
-						});
-						response = ObservableSlim.create(response, true, function(changes) {
-							console.log('response', JSON.stringify(changes));
-						});*/
-						// Results in infinite circular calls...
+						response.on('finish', () => {
+							const info = requests.get(request.__r2_id);
+							if (!info) return
+
+							const finish = Date.now();
+
+							addRequestData(request, {
+								start: finish,
+								end: finish,
+								type: 'finish',
+								diffs: {
+									request: diff(
+										info.start.request,
+										cloneButIgnore(request, diffExcludedProperties),
+										{
+											commonColor: string => string,
+											patchColor: string => string,
+											aAnnotation: 'Original',
+											aColor: string => '<R2_A>' + string + '</R2_A>',
+											bAnnotation: 'Modified',
+											bColor: string => '<R2_B>' + string + '</R2_B>',
+											expand: false,
+											contextLines: 0,
+											includeChangeCounts: true
+										}
+									).replace(/@@.*?@@\n/g, ''),
+									response: diff(
+										info.start.response,
+										cloneButIgnore(response, diffExcludedProperties),
+										{
+											commonColor: string => string,
+											patchColor: string => string,
+											aAnnotation: 'Original',
+											aColor: string => '<R2_A>' + string + '</R2_A>',
+											bAnnotation: 'Modified',
+											bColor: string => '<R2_B>' + string + '</R2_B>',
+											expand: false,
+											contextLines: 0,
+											includeChangeCounts: true
+										}
+									).replace(/@@.*?@@\n/g, '')
+								}
+							});
+						})
 					}
 					if (!('__r2_redirect' in response)) {
 						response.__r2_redirect = response.redirect;
@@ -182,7 +247,7 @@ function wrapHandler(method, handler) {
 								start,
 								end: Date.now(),
 								type: 'redirect',
-								evaluate_lines: getProjectLines(),
+								evaluate: getEvaluateInfo(),
 								path, status
 							});
 						}
@@ -202,7 +267,7 @@ function wrapHandler(method, handler) {
 									start,
 									end: Date.now(),
 									type: 'view',
-									evaluate_lines: getProjectLines(),
+									evaluate: getEvaluateInfo(),
 									name: name,
 									locals: {
 										...(response.app.locals || {}),
@@ -226,8 +291,8 @@ function wrapHandler(method, handler) {
 								start,
 								end: Date.now(),
 								type: 'send',
-								evaluate_lines: getProjectLines(),
-								body: typeof body === 'object' ? inspect(bodyCopy, { numericSeparator: true, depth: null, maxArrayLength: null, maxStringLength: null, breakLength: 40 }) : bodyCopy,
+								evaluate: getEvaluateInfo(),
+								body: typeof body === 'object' ? util.inspect(bodyCopy, { numericSeparator: true, depth: null, maxArrayLength: null, maxStringLength: null, breakLength: 40 }) : bodyCopy,
 								contentType
 							});
 						}
@@ -242,65 +307,31 @@ function wrapHandler(method, handler) {
 								start,
 								end: Date.now(),
 								type: 'json',
-								evaluate_lines: getProjectLines(),
-								body: terminalCodesToHtml(inspect(body, { colors: true, numericSeparator: true, depth: null, maxArrayLength: null, maxStringLength: null, breakLength: 40 })),
+								evaluate: getEvaluateInfo(),
+								body: terminalCodesToHtml(util.inspect(body, { colors: true, numericSeparator: true, depth: null, maxArrayLength: null, maxStringLength: null, breakLength: 40 })),
 							});
 						}
 						response.json = json;
 					}
 					if (!('__r2_start' in request)) request.__r2_start = []
 					request.__r2_start.push(Date.now());
-					ignored = callback(request, handler) || ignoredMiddlewares.some(regex => regex.test(handler.name));
-					if (ignored) return next();
 
-					originals.request = cloneButIgnore(request, ignoredProperties);
-					originals.response = cloneButIgnore(response, ignoredProperties);
+					originals.request = cloneButIgnore(request, diffExcludedProperties);
+					originals.response = cloneButIgnore(response, diffExcludedProperties);
 					next(error);
 				},
 				after(error, request, response, next, paramValue, realEnd) {
 					const { __r2_start } = request;
 					const start = __r2_start.pop();
-					if (ignored) {
-						addRequestData(request, {
-							start,
-							end: realEnd || Date.now(),
-							error: errorToInfo(error),
-							type: 'middleware',
-							handler,
-							ignored: true,
-						});
+					if (handler.__r2_wrapper) {
 						return next(error);
 					}
 
-					/*
-					let requestDiff;
-					const rawRequest = cloneButIgnore(request, ignoredProperties)
-					try {
-						requestDiff = getDiff(
-							JSON.parse(stringify(originals.request)),
-							JSON.parse(stringify(rawRequest)),
-							true
-						);
-					} catch (e) {
-						requestDiff = {};
-					}
-					let responseDiff;
-					const rawResponse = cloneButIgnore(response, ignoredProperties)
-					try {
-						responseDiff = getDiff(
-							JSON.parse(stringify(originals.response)),
-							JSON.parse(stringify(rawResponse)),
-							true
-						);
-					} catch (e) {
-						responseDiff = {};
-					}*/
 					let requestDiff = '';
 					try {
-						
 						requestDiff = diff(
 							originals.request,
-							cloneButIgnore(request, ignoredProperties),
+							cloneButIgnore(request, diffExcludedProperties),
 							{
 								commonColor: string => string,
 								patchColor: string => string,
@@ -320,7 +351,7 @@ function wrapHandler(method, handler) {
 					try {
 						responseDiff = diff(
 							originals.response,
-							cloneButIgnore(response, ignoredProperties),
+							cloneButIgnore(response, diffExcludedProperties),
 							{
 								commonColor: string => string,
 								patchColor: string => string,
@@ -336,9 +367,6 @@ function wrapHandler(method, handler) {
 					} catch (e) {
 						responseDiff = 'Unable to inspect'
 					}
-
-					//if (Object.keys(requestDiff).length) debug(`request: ${Object.keys(requestDiff).reduce((string, key) => `${string}\n  ${key}: ${util.inspect(requestDiff[key].before, { depth: 1, colors: true, }).replace(/\n/g, '\n  ')} -> ${util.inspect(requestDiff[key].after, { depth: 1, colors: true, }).replace(/\n/g, '\n  ')}`, '')}`);
-					//if (Object.keys(responseDiff).length) debug(`response: ${Object.keys(responseDiff).reduce((string, key) => `${string}\n  ${key}: ${util.inspect(responseDiff[key].before, { depth: 1, colors: true, }).replace(/\n/g, '\n  ')} -> ${util.inspect(responseDiff[key].after, { depth: 1, colors: true, }).replace(/\n/g, '\n  ')}`, '')}`);
 
 					addRequestData(request, {
 						start,
@@ -411,6 +439,7 @@ function wrapInstance(instance, options = {}) {
 		if (!mainFilepath) console.error('options.main not set, graph will not be available');
 		server.listen(options.port, () => console.log(`UI available at http://localhost:${options.port}/`))
 	}
+	if (options.diffExcludedProperties) diffExcludedProperties = options.diffExcludedProperties.map(s => new RegExp(s));
 	instance.__r2_construct_lines = getProjectLines();
 	const me = wrapMethods(instance);
 
@@ -479,8 +508,8 @@ server.get('/requests', (_, res) => {
 		if (key === 'handler' && typeof value === 'function') {
 			// All unseen functions get a new locate function created that sets the value in the map when completed
 			if (!fnLocations.has(value)) {
-				//fnLocations.set(value, null);
-				//locates.push(locate(value).then(loc => fnLocations.set(value, loc)).catch(() => undefined));
+				fnLocations.set(value, null);
+				locates.push(locate(value).then(loc => fnLocations.set(value, loc)).catch(() => undefined));
 			}
 			return value;
 		}
@@ -492,13 +521,7 @@ server.get('/requests', (_, res) => {
 			for (const [i, event] of value.events.entries()) {
 				if (typeof event.handler !== 'function') continue;
 				// THIS MUTATES THE REQUESTS PERM
-				event.handler = {
-					name: event.handler.name,
-					adds: event.handler.__r2_add_lines,
-					construct: event.handler.__r2_construct_lines,
-					location: fnLocations.get(event.handler) || undefined,
-				}
-				if (IGNORED_STACK_SOURCES.some(ignore => event.handler.location?.path.includes(ignore))) delete event.handler.location;
+				event.handler = replaceHandler(event.handler);
 				/*
 				if (event.handler.adds?.length <= 1) continue;
 				const possible = event.handler.adds;
@@ -603,35 +626,4 @@ async function sayHelloStack() {
 	console.log(await global.__r2_post('Debugger.enable'));
 	//console.log(await global.__r2_post('Debugger.pause'));
 	//console.log(await global.__r2_post('Debugger.resume'));
-}
-
-
-
-function deepIsEqual(one, two) {
-	if (one === two) return true;
-	if (typeof one !== typeof two) return false;
-	if (one === null && two !== null || one !== null && two === null) return false;
-	if (typeof one === 'object') return [...new Set([...Object.keys(one), ...Object.keys(two)])].every(key => deepIsEqual(one[key], two[key]));
-	return false;
-}
-
-function shallowCopyObject(obj, ignoredProperties = []) {
-	const copy = {};
-	for (const key in obj) {
-		if (!ignoredProperties.some(regex => regex.test(key))) copy[key] = obj[key];
-	}
-	return copy;
-}
-
-function objectDiffs(one, two) {
-	const diff = {};
-	for (const key of [...new Set([...Object.keys(one), ...Object.keys(two)])]) {
-		if (!circularDeepEqual(one[key], two[key])) {
-			diff[key] = {
-				before: one[key],
-				after: two[key]
-			};
-		}
-	}
-	return diff;
 }
