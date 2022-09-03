@@ -657,7 +657,13 @@ renderRequestsSelect()
 
 function generateEventLabel(event) {
 	let label = 'Unknown';
-	if (event.type === 'middleware') label = event.handler.name ? `${event.handler.name}()` : '<anonymous>'
+	if (event.type === 'middleware') {
+		if (event.handler.name === 'router'){
+			const constructFilename = event.handler.construct?.[0].replace(root, '').split(':').slice(0, -2)
+			const routeAddedTo = (event.handler?.code?.adds?.[1].match(/use\(('|"|`)(.*?)\1/i) || { 2: '' })[2]
+			return [routeAddedTo && `"${routeAddedTo}"` || '', constructFilename].join(' ');
+		} else label = event.handler.name ? `${event.handler.name}()` : '<anonymous>'
+	}
 	else if (event.type === 'redirect') label = `Redirect to ${event.path}`
 	else if (event.type === 'view') label = viewsDirectory + `/` + event.name
 	else if (event.type === 'send') label = 'response.send()'
@@ -684,10 +690,13 @@ function renderMiddlewaresSelect() {
 	const eventsSelector = document.querySelector('#events')
 	const selected = eventsSelector.value;
 	eventsSelector.innerHTML = '';
+	const ends = []
 	eventsSelector.appendChild(currentRequest.events.reduce((frag, e, i) => {
+		const endingAfterMe = ends.filter(end => end > e.start).length
+		ends.push(e.end)
 		const option = document.createElement('option')
 		option.value = i;
-		option.textContent = generateEventLabel(e);
+		option.textContent = '-'.repeat(endingAfterMe) + generateEventLabel(e);
 		frag.appendChild(option)
 		if (selected == option.value) option.selected = true;
 		return frag
