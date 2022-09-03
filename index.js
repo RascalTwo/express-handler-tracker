@@ -311,7 +311,7 @@ function wrapInstance(instance, options = {}) {
 	if (options.entryPoint) SETTINGS.entryPoint = options.entryPoint
 	if (options.port) {
 		if (!options.entryPoint) console.error('options.entryPoint not set, EHT server will not be running');
-		server.listen(options.port, () => console.log(`UI available at http://localhost:${options.port}/`))
+		server.listen(options.port, () => console.log(`EHT available at http://localhost:${options.port}/`))
 	}
 	if (options.diffExcludedProperties) SETTINGS.diffExcludedProperties = options.diffExcludedProperties.map(s => new RegExp(s));
 
