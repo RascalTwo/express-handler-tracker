@@ -755,10 +755,12 @@ const observer = new MutationObserver(mutations => {
 })
 document.querySelectorAll('.window').forEach(w => observer.observe(w, { attributeFilter: ['class'] }))
 
+/*
 document.getElementById("save").addEventListener("click", function () {
 	window.localStorage.setItem("cy-elements", JSON.stringify(cy.json()));
 	alert('Graph Layout save to Local Storage')
 });
+*/
 
 document.querySelector('#window1').setAttribute('style', window.localStorage.getItem("window1-style") || '');
 document.querySelector('#window2').setAttribute('style', window.localStorage.getItem("window2-style") || '');
@@ -780,7 +782,7 @@ document.querySelector('#button4').addEventListener('click', () => setTimeout(()
 document.querySelector('#button5').addEventListener('click', () => setTimeout(() => localStorage.setItem(`window5-style`, document.querySelector('#window' + 5).getAttribute('style')), 1000));
 document.querySelector('#button6').addEventListener('click', () => setTimeout(() => localStorage.setItem(`window6-style`, document.querySelector('#window' + 6).getAttribute('style')), 1000));
 
-
+/*
 document.getElementById("restore").addEventListener("click", function () {
 	cy.elements().remove();
 	cy.json({ elements: JSON.parse(window.localStorage.getItem("cy-elements")).elements }).layout({ name: 'preset' }).run();
@@ -788,6 +790,7 @@ document.getElementById("restore").addEventListener("click", function () {
 	renderMiddleware()
 	renderBubbles();
 });
+*/
 
 document.querySelector('#reset-windows').addEventListener('click', () => {
 	for (const child of document.querySelector('.windowGroup').children) {
@@ -805,7 +808,7 @@ document.querySelector('#reset-all').addEventListener('click', () => {
 	alert('All local settings cleared')
 	window.location.reload()
 })
-
+/*
 document.querySelector('#export').addEventListener('click', () => {
 	const data = Flatted.stringify({
 		requests,
@@ -855,5 +858,5 @@ document.querySelector('#import').addEventListener('click', () => {
 		document.querySelector('#window6').setAttribute('style', data.windows[3]);
 	});
 });
-
+*/
 document.querySelectorAll('.window').forEach(w => w.addEventListener('click', e => activeWindow(e.currentTarget)));

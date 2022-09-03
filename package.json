@@ -9,6 +9,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "chalk": "^5.0.1",
     "clone": "^2.1.2",
     "cors": "^2.8.5",
     "dependency-cruiser": "^11.15.0",
@@ -16,9 +17,11 @@
     "fast-equals": "^4.0.3",
     "flatted": "^3.2.7",
     "func-loc": "^0.1.16",
+    "inquirer": "^9.1.0",
     "jest-diff": "^29.0.1",
     "lodash.flattendeep": "^4.4.0",
     "terminal-codes-to-html": "^0.0.1",
-    "underscore": "^1.13.4"
+    "underscore": "^1.13.4",
+    "yargs": "^17.5.1"
   }
 }
