@@ -40,9 +40,11 @@ npx https://github.com/RascalTwo/expess-handler-tracker
 It has all the options that can be manually crafted:
 
 ```shell
+instrument.js [command]
+
 Commands:
-  index.js instrument    Instrument code
-  index.js deinstrument  Remove instrumentation from code
+  instrument.js instrument    Instrument code
+  instrument.js deinstrument  Remove instrumentation from code
 
 Options:
   --help                    Show help                                  [boolean]
@@ -53,9 +55,10 @@ Options:
                             request & response differences               [array]
   --subRoute                Route to expose EHT server in existing Express
                             Application                                 [string]
+  --yesToAll                Approve of all changes without prompt      [boolean]
 ```
 
-It will attempt to automatically detect a valid JavaScript file in the current working directory to use as an `entryPoint`, meaning that from your project directory you only need to execute
+It will attempt to detect a valid JavaScript file in the current working directory to use as an `entryPoint`, meaning that from your project directory you only need to execute
 
 ```shell
 npx https://github.com/RascalTwo/expess-handler-tracker instrument
@@ -63,9 +66,13 @@ npx https://github.com/RascalTwo/expess-handler-tracker instrument
 
 and approve each of the changes to get started!
 
-### Manual Instrumentation
+> To automatically reverse the process you can use the `deinstrument` subcommand:
 
-currently this must be done manually:
+```shell
+npx https://github.com/RascalTwo/expess-handler-tracker deinstrument
+```
+
+### Manual Instrumentation
 
 ```javascript
 const app = require('@rascal_two/express-handler-tracker')(express(), { entryPoint: 'index.js', port: 1234 })
@@ -80,7 +87,7 @@ This instrumentation method requires a single option:
 }
 ```
 
-Additionally there are optional properties that can be used:
+There do exist optional properties that can be used for customization:
 
 ```javascript
 {
@@ -125,7 +132,7 @@ app = require('@rascal_two/express-handler-tracker')(app, { entryPoint: 'index.j
 
 ## Troubleshooting
 
-If you find requests take a long time, the most likely cause is that something large has been stringified during diffing, the solution is to wait for it to complete and then locate the middleware that has taken the longest time.
+If you find requests take a long time, the most likely cause is that something large has been stringified during calculating the changes a event has made, the solution is to wait for it to complete and then locate the middleware that has taken the longest time.
 
 Then select it and manually inspect it to see which base property contains the most text.
 
@@ -146,19 +153,53 @@ If the EHT frontend is not your desire, all the raw information is accessible vi
 - `/info`
   - Dependency and view information.
 
-#### Layouts
+#### Website
 
-There are a few ways to customize and preserve layouts, first being the automatic generator, which while defaulted to `dagre-network`, allows for various user choices.
+The first feature of the website is that - unless something unexpected happens - you never need to refresh the page to receive new events, they are streamed from the EHT server.
 
-Next is the Grouping toggle, allowing switching between compound nodes to represent directories vs Bubblesets.
+***
 
-While these automatic-placements of nodes can be accurate, you are expected to customize the graph to your application, hence the inclusion of Export/Import and Save/Load buttons.
+You'll first be presented with a graph of various nodes with edges between them, some grouped together in compound nodes.
 
-#### Request Playback
+This is the primary view, showing you every file and directory in the project, allowing you to manually move the nodes around as you desire.
 
-Any of the tracked requests can be selected from the dropdown, after which the first event will be rendered in the graph, and traversal through the events are possible via the next controls section.
+Each of these nodes can be clicked to open the file up in Visual Studio Code
 
-Additionally there are two togglable modals, for `Request` and `Response` difference inspection - these modals will display the detected changes from the current middleware.
+***
+
+The bar at the bottom contains all the possible windows
+
+##### Layouts
+
+Settings for how the nodes are layed out on the page, from automatic placement algorithms, to use groups or bubble sets, displaying all or only current request edges, theming, and animation duration.
+
+Additionally there are style rules, which determine the color and shape of all nodes on the page.
+
+The pattern can be inputted any valid Regular Expression for nodes to match - this will be ran on the filename - in addition to the color and shape to make matching nodes.
+
+##### Requests
+
+The Request inspector allows one to see all the requests that have come in, the events associated for each, and the ability to navigate through all of them one by one - which updates the contents of other windows appropriately.
+
+Events that have been indented with hyphens are detected as sub-events, for example events that occurred within a unique Express Router.
+
+> The Event toast that appears within the graph contains all known links for the event in question - from where it was added to the application, where it was evaluated, router construction, etc - all clickable to open the file to that location in Visual Studio Code
+
+##### Request Inspector
+
+Shows the changes to the request due to the currently selected event.
+
+##### Response Inspector
+
+Shows the changes to the request due to the currently selected event - additionally shows data passed to view rendering, sent data, and more output-related information.
+
+##### Current Code
+
+The current code for the selected middleware
+
+##### All Code
+
+All of the code for the current request, with render buttons to render straight to that event in question.
 
 ### How it works
 
@@ -169,3 +210,5 @@ Manual overrides of common method such as `response.send`, `response.json`, `res
 Discovery of dependencies via [dependency-cruiser](https://github.com/sverweij/dependency-cruise).
 
 Routing override logic inspired by [`express-promise-router`](https://github.com/express-promise-router/express-promise-router).
+
+Cloning done via [`@ungap/structured-clone`](https://github.com/ungap/structured-clone).
