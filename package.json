@@ -3,14 +3,12 @@
   "version": "0.1.0",
   "description": "Tracks everything an Express application does - middlewares, responses, everything.",
   "main": "index.js",
-  "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
-  },
-  "author": "",
+  "author": "Rascal_Two <therealrascaltwo@gmail.com>",
   "license": "ISC",
+  "bin": "instrument.js",
   "dependencies": {
+    "@ungap/structured-clone": "^1.0.1",
     "chalk": "^5.0.1",
-    "clone": "^2.1.2",
     "cors": "^2.8.5",
     "dependency-cruiser": "^11.15.0",
     "express": "^4.18.1",
@@ -19,9 +17,19 @@
     "func-loc": "^0.1.16",
     "inquirer": "^9.1.0",
     "jest-diff": "^29.0.1",
-    "lodash.flattendeep": "^4.4.0",
     "terminal-codes-to-html": "^0.0.1",
-    "underscore": "^1.13.4",
     "yargs": "^17.5.1"
-  }
+  },
+  "scripts": {
+    "start": "node server.js"
+  },
+  "devDependencies": {},
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/RascalTwo/expess-handler-tracker.git"
+  },
+  "bugs": {
+    "url": "https://github.com/RascalTwo/expess-handler-tracker/issues"
+  },
+  "homepage": "https://github.com/RascalTwo/expess-handler-tracker#readme"
 }
