@@ -24,7 +24,12 @@ server.get('/graph', function renderGraphPage(_, response){
 });
 server.get('/info', function sendDependencyInfo(_, response){
 	const { output: { modules } } = cruise([SETTINGS.entryPoint], { exclude: ['node_modules', 'express-handler-tracker'] });
-	response.send({ modules: modules.map(({ source, dependencies }) => ({ source, dependencies: dependencies.map(({ resolved }) => resolved) })), root: path.dirname(path.resolve(SETTINGS.entryPoint)) + '/', viewsDirectory: SETTINGS.viewsDirectory });
+	const root = path.dirname(path.resolve(SETTINGS.entryPoint)) + '/'
+	response.send({
+		modules: modules.map(({ source, dependencies }) => ({ source, dependencies: dependencies.map(({ resolved }) => resolved) })),
+		root,
+		viewsDirectory: path.relative(root, SETTINGS.viewsDirectory)
+	});
 });
 
 server.get('/events', handleSSERequests)
@@ -58,7 +63,7 @@ server.get('/requests', function sendRequests(_, response){
 			for (const [i, event] of value.events.entries()) {
 				if (typeof event.handler !== 'function') continue;
 				// THIS MUTATES THE REQUESTS PERM
-				event.handler = getHandlerInfo(event.handler);
+				event.handler = getHandlerInfo(event.handler, value.events.filter(e => e.handler && e.order < event.order).map(e => e.handler));
 				/*
 				if (event.handler.adds?.length <= 1) continue;
 				const possible = event.handler.adds;

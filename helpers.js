@@ -1,7 +1,7 @@
 const fs = require('fs');
 
 const jestDiff = require('jest-diff');
-const underscore = require('underscore')
+const structuredClone = require('@ungap/structured-clone').default;
 
 const funcLoc = require('func-loc');
 
@@ -41,20 +41,21 @@ function getLinesFromFilepathWithLocation(path) {
 	return fs.readFileSync(filepath).toString().split('\n').slice(Math.max(0, start - 2), end);
 }
 
-async function normalizeEvent(event) {
-	if (typeof event.handler === 'function') {
-
+async function normalizeEvent(event, previousEvents) {
+	if (typeof event.handler === 'function' && !FUNCTION_LOCATIONS.has(event.handler)) {
 		FUNCTION_LOCATIONS.set(event.handler, null);
 		await funcLoc.locate(event.handler).then(loc => FUNCTION_LOCATIONS.set(event.handler, loc)).catch(() => undefined)
 	}
 
 
-	if (event.handler) event.handler = getHandlerInfo(event.handler)
+	if (typeof event.handler === 'function') {
+		event.handler = getHandlerInfo(event.handler, previousEvents.filter(event => typeof event.handler === 'object').map(event => event.handler))
+	}
 	return event
 }
 
 
-function getHandlerInfo(handler) {
+function getHandlerInfo(handler, previousHandlers) {
 	const location = FUNCTION_LOCATIONS.get(handler)
 	const obj = {
 		name: handler.name,
@@ -64,7 +65,7 @@ function getHandlerInfo(handler) {
 		code: {
 			adds: handler.__r2_add_lines?.length ? getLinesFromFilepathWithLocation(handler.__r2_add_lines[0][0]) : undefined,
 			construct: handler.__r2_construct_lines ? getLinesFromFilepathWithLocation(handler.__r2_construct_lines[0]) : undefined,
-			location: getLinesFromFilepathWithLocation(`${location.path}:${location.line}-${location.line + handler.toString().split('\n').length}:${location.column}`),
+			location: location ? getLinesFromFilepathWithLocation(`${location.path}:${location.line}-${location.line + handler.toString().split('\n').length}:${location.column}`) : undefined,
 		}
 	};
 	if (IGNORED_STACK_SOURCES.some(ignore => obj.location?.path.includes(ignore))) {
@@ -88,7 +89,8 @@ function getEvaluateInfo() {
 function addRequestData(request, data) {
 	const info = REQUESTS.get(request.__r2_id);
 	if (!info) return;
-	info.events.push({ ...data, order: info.events.length });
+	data.order = info.events.length;
+	info.events.push(data);
 	info.events.sort((a, b) => a.start - b.start || a.order - b.order);
 	info.end = { request: clone(request), response: clone(request.res) }
 	if (!SSE.clients.length) return;
@@ -118,7 +120,8 @@ function cloneButIgnore(obj, ignoredProperties, ...cloneArgs) {
 	for (const key in obj) {
 		if (!ignoredProperties.some(regex => regex.test(key))) shallow[key] = obj[key];
 	}
-	return underscore.clone(shallow, ...cloneArgs);
+
+	return structuredClone(shallow, { lossy: true });
 }
 
 function clone(object) {

@@ -2,25 +2,14 @@ const util = require('util');
 
 const httpMethods = require("methods")
 const { terminalCodesToHtml } = require("terminal-codes-to-html");
-
-const { clone } = require('underscore');
+const funcLoc = require('func-loc');
 
 const { SETTINGS, REQUESTS } = require('./globals')
 const { MIDDLEWARE_WAIT_TIME } = require('./constants')
 
 const server = require('./server')
 const { startSSE } = require('./sse')
-const { getProjectLines, addRequestData, generateDiffString, getLinesFromFilepathWithLocation, getEvaluateInfo } = require('./helpers')
-
-/*
-const path = require('path');
-
-const fs = require('fs')
-const underscore = require('underscore');
-const express = require('express');
-const Flatted = require('flatted');
-*/
-
+const { getProjectLines, addRequestData, generateDiffString, getLinesFromFilepathWithLocation, getEvaluateInfo, clone, getHandlerInfo } = require('./helpers')
 
 function errorToInfo(error) {
 	if (!error) return undefined;
@@ -174,7 +163,30 @@ const returnHandler = (method, handler) => args => {
 	function after(error, request, response, next, paramValue, realEnd) {
 		const { __r2_start } = request;
 		const start = __r2_start.pop();
-		if (handler.__r2_wrapper) return next(error);
+
+		if (handler.__r2_wrapper) {
+			const info = REQUESTS.get(request.__r2_id)
+			if (info) {
+				let last;
+				for (const event of [...info.events.sort((a, b) => a.order - b.order)].reverse()){
+					if (event.type === 'middleware'){
+						if (event.handler?.name === handler.name) last = event;
+						break
+					}
+				}
+				if (last?.handler?.name === handler.name) {
+					const accurateInfo = getHandlerInfo(handler, info.events.filter(event => typeof event.handler === 'object').map(event => event.handler))
+					if (accurateInfo.adds.length && accurateInfo.adds[0].length) {
+						last.handler.adds = accurateInfo.adds;
+						if (accurateInfo.code?.adds) {
+							if (!last.handler.code) last.handler.code = {}
+							last.handler.code.adds = accurateInfo.code.adds;
+						}
+					}
+					return next(error);
+				}
+			}
+		}
 
 		const diffs = {
 			request: '',
@@ -193,7 +205,7 @@ const returnHandler = (method, handler) => args => {
 			end: realEnd || Date.now(),
 			error: errorToInfo(error),
 			type: 'middleware',
-			handler,
+			handler: getHandlerInfo(handler, REQUESTS.get(request.__r2_id).events.filter(event => typeof event.handler === 'object').map(event => event.handler)),
 			diffs
 		});
 		next(error);
@@ -225,16 +237,41 @@ function wrapHandler(method, handler) {
 	if (handler.name === 'router' && !('__r2_construct_lines' in handler)) console.error('Un-instrumented router found:', getProjectLines()[0]);
 	if (typeof handler !== "function") throw new Error("Expected a callback function but got a " + Object.prototype.toString.call(handler));
 
-	const wrapperObj = {};
-	if (handler.length === 4) wrapperObj[handler.name] = function (err, req, res, next) {
-		return returnHandler(method, handler)([err, req, res, next]);
+	funcLoc.locate(handler).then(loc => FUNCTION_LOCATIONS.set(handler, loc)).catch(() => undefined);
+
+	if (!('__r2_add_lines' in handler)) handler.__r2_add_lines = [...(handler.__r2_add_lines || []), getProjectLines()];
+	else {
+		const oldHandler = handler;
+		const evalWrapper = handler.length === 4 ? {
+			[handler.name]: function (err, req, res, next) {
+				return oldHandler(err, req, res, next);
+			}
+		} : {
+			[handler.name]: function (req, res, next) {
+				return oldHandler(req, res, next);
+			}
+		}
+		evalWrapper[handler.name].__r2_wrapper = true;
+		evalWrapper[handler.name].__r2_add_lines = [...(evalWrapper[handler.name].__r2_add_lines || []), getProjectLines()];
+		handler = evalWrapper[handler.name];
+		handler.__r2_wrapper = true;
 	}
-	else wrapperObj[handler.name] = function (req, res, next) {
-		return returnHandler(method, handler)([req, res, next]);
+
+	let wrapperObj = {};
+	if (handler.length === 4) wrapperObj = {
+		[handler.name]: function (err, req, res, next) {
+			return returnHandler(method, handler)([err, req, res, next]);
+		}
+	}
+	else wrapperObj = {
+		[handler.name]: function (req, res, next) {
+			return returnHandler(method, handler)([req, res, next]);
+		}
 	}
 
 	wrapperObj[handler.name].__r2_wrapper = true;
 	handler.__r2_add_lines = [...(handler.__r2_add_lines || []), getProjectLines()];
+	wrapperObj[handler.name].__r2_add_lines = [...(wrapperObj[handler.name].__r2_add_lines || []), getProjectLines()];
 
 	if (handler.name === "router") Object.assign(wrapperObj[handler.name], handler);
 
@@ -268,7 +305,7 @@ function wrapMethods(instance, isRoute) {
 function wrapInstance(instance, options = {}) {
 	try {
 		const views = instance.get('views');
-		if (views instanceof String) SETTINGS.viewsDirectory = views;
+		if (typeof views === 'string') SETTINGS.viewsDirectory = views;
 	} catch (e) { }
 
 	if (options.entryPoint) SETTINGS.entryPoint = options.entryPoint
