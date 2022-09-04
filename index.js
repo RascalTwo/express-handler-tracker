@@ -4,7 +4,7 @@ const httpMethods = require("methods")
 const { terminalCodesToHtml } = require("terminal-codes-to-html");
 const funcLoc = require('func-loc');
 
-const { SETTINGS, REQUESTS } = require('./globals')
+const { SETTINGS, REQUESTS, FUNCTION_LOCATIONS } = require('./globals')
 const { MIDDLEWARE_WAIT_TIME } = require('./constants')
 
 const server = require('./server')
@@ -17,7 +17,7 @@ function errorToInfo(error) {
 	return {
 		stack: error.stack,
 		lines,
-		code: getLinesFromFilepathWithLocation(lines[0])
+		code: lines.length ? getLinesFromFilepathWithLocation(lines[0]) : undefined
 	}
 }
 
@@ -35,7 +35,7 @@ const returnHandler = (method, handler) => args => {
 
 	const requestChanges = {
 		__r2_id(request, response) {
-			const id = request.headers['x-r2-id'] || Date.now();
+			const id = request.headers['x-r2-id'] || performance.now();
 			REQUESTS.set(id, {
 				start: { request: clone(request), response: clone(response) },
 				events: [],
@@ -44,7 +44,9 @@ const returnHandler = (method, handler) => args => {
 				const info = REQUESTS.get(id);
 				if (!info) return;
 
-				const finish = Date.now();
+				for (const func of response.__r2_sync_finishes || []) func();
+
+				const finish = performance.now();
 				addRequestData(request, {
 					start: finish,
 					end: finish,
@@ -65,11 +67,11 @@ const returnHandler = (method, handler) => args => {
 			response.redirect = function redirect(first, second) {
 				const path = second || first
 				const status = second ? first : 302
-				const start = Date.now();
+				const start = performance.now();
 				response.__r2_redirect(status, path);
 				addRequestData(request, {
 					start,
-					end: Date.now(),
+					end: performance.now(),
 					type: 'redirect',
 					evaluate: getEvaluateInfo(),
 					path, status
@@ -80,7 +82,7 @@ const returnHandler = (method, handler) => args => {
 		__r2_render(request, response) {
 			const original = response.render;
 			response.render = function render(name, locals, callback) {
-				const start = Date.now()
+				const start = performance.now()
 				const actualLocals = typeof locals === 'function' ? undefined : locals;
 				const actualCallback = typeof callback === 'function' ? callback : typeof locals === 'function' ? callback : (err, str) => {
 					if (err) return request.next(err);
@@ -89,7 +91,7 @@ const returnHandler = (method, handler) => args => {
 				response.__r2_render(name, actualLocals, function onRenderFinish(err, html) {
 					addRequestData(request, {
 						start,
-						end: Date.now(),
+						end: performance.now(),
 						type: 'view',
 						evaluate: getEvaluateInfo(),
 						name: name,
@@ -110,11 +112,11 @@ const returnHandler = (method, handler) => args => {
 			response.send = function send(body) {
 				const bodyCopy = body instanceof Buffer ? body.copy() : body
 				const contentType = response.get('Content-Type');
-				const start = Date.now();
+				const start = performance.now();
 				response.__r2_send(body);
 				addRequestData(request, {
 					start,
-					end: Date.now(),
+					end: performance.now(),
 					type: 'send',
 					evaluate: getEvaluateInfo(),
 					body: typeof body === 'object' ? util.inspect(bodyCopy, { numericSeparator: true, depth: null, maxArrayLength: null, maxStringLength: null, breakLength: 40 }) : bodyCopy,
@@ -126,11 +128,11 @@ const returnHandler = (method, handler) => args => {
 		__r2_json(request, response) {
 			const original = response.json;
 			response.json = function json(body) {
-				const start = Date.now();
+				const start = performance.now();
 				response.__r2_json(body);
 				addRequestData(request, {
 					start,
-					end: Date.now(),
+					end: performance.now(),
 					type: 'json',
 					evaluate: getEvaluateInfo(),
 					body: terminalCodesToHtml(util.inspect(body, { colors: true, numericSeparator: true, depth: null, maxArrayLength: null, maxStringLength: null, breakLength: 40 })),
@@ -141,6 +143,7 @@ const returnHandler = (method, handler) => args => {
 	}
 
 	let originals = {};
+	let start;
 
 	function before(error, request, response, next, paramValue) {
 		for (const key in requestChanges) {
@@ -150,8 +153,7 @@ const returnHandler = (method, handler) => args => {
 			if (!(key in response)) response[key] = responseChanges[key](request, response);
 		}
 
-		if (!('__r2_start' in request)) request.__r2_start = []
-		request.__r2_start.push(Date.now());
+		start = performance.now();
 
 		originals = {
 			request: clone(request),
@@ -161,8 +163,6 @@ const returnHandler = (method, handler) => args => {
 	}
 
 	function after(error, request, response, next, paramValue, realEnd) {
-		const { __r2_start } = request;
-		const start = __r2_start.pop();
 
 		if (handler.__r2_wrapper) {
 			const info = REQUESTS.get(request.__r2_id)
@@ -202,7 +202,7 @@ const returnHandler = (method, handler) => args => {
 
 		addRequestData(request, {
 			start,
-			end: realEnd || Date.now(),
+			end: realEnd || performance.now(),
 			error: errorToInfo(error),
 			type: 'middleware',
 			handler: getHandlerInfo(handler, REQUESTS.get(request.__r2_id).events.filter(event => typeof event.handler === 'object').map(event => event.handler)),
@@ -212,10 +212,15 @@ const returnHandler = (method, handler) => args => {
 	}
 
 
-	before(error, request, response, () => {
+	before(error, request, response, () => setTimeout(() => {
 		let nextAfter = (error, newNext = next, realEnd) => {
 			nextAfter = undefined;
-			after(error, request, response, newNext, paramValue, realEnd);
+			setTimeout(() => after(error, request, response, newNext, paramValue, realEnd), 1);
+		}
+
+		const finishHandler = () => {
+			if (!nextAfter) return
+			nextAfter(undefined, () => undefined, undefined);
 		}
 
 		let ret
@@ -225,19 +230,16 @@ const returnHandler = (method, handler) => args => {
 
 		if (ret && typeof ret.then === 'function') return ret.then(() => nextAfter(undefined, () => undefined), err => nextAfter(err, next));
 
-		const realEnd = Date.now();
-		setTimeout(() => {
-			if (!nextAfter) return
-			nextAfter(undefined, () => undefined, realEnd);
-		}, MIDDLEWARE_WAIT_TIME);
-	}, paramValue);
+		response.__r2_sync_finishes = [...(response.__r2_sync_finishes || []), finishHandler]
+		setTimeout(finishHandler, MIDDLEWARE_WAIT_TIME);
+	}, 1), paramValue);
 }
 
 function wrapHandler(method, handler) {
 	if (handler.name === 'router' && !('__r2_construct_lines' in handler)) console.error('Un-instrumented router found:', getProjectLines()[0]);
 	if (typeof handler !== "function") throw new Error("Expected a callback function but got a " + Object.prototype.toString.call(handler));
 
-	funcLoc.locate(handler).then(loc => FUNCTION_LOCATIONS.set(handler, loc)).catch(() => undefined);
+	const locPromise = FUNCTION_LOCATIONS.has(handler) ? Promise.resolve(FUNCTION_LOCATIONS.get(handler)) : funcLoc.locate(handler).then(loc => FUNCTION_LOCATIONS.set(handler, loc).get(handler))
 
 	if (!('__r2_add_lines' in handler)) handler.__r2_add_lines = [...(handler.__r2_add_lines || []), getProjectLines()];
 	else {
@@ -251,10 +253,9 @@ function wrapHandler(method, handler) {
 				return oldHandler(req, res, next);
 			}
 		}
-		evalWrapper[handler.name].__r2_wrapper = true;
-		evalWrapper[handler.name].__r2_add_lines = [...(evalWrapper[handler.name].__r2_add_lines || []), getProjectLines()];
 		handler = evalWrapper[handler.name];
 		handler.__r2_wrapper = true;
+		locPromise.then(loc => handler.__r2_location = loc)
 	}
 
 	let wrapperObj = {};
@@ -269,8 +270,9 @@ function wrapHandler(method, handler) {
 		}
 	}
 
-	wrapperObj[handler.name].__r2_wrapper = true;
 	handler.__r2_add_lines = [...(handler.__r2_add_lines || []), getProjectLines()];
+	locPromise.then(loc => handler.__r2_location = loc)
+	wrapperObj[handler.name].__r2_wrapper = true;
 	wrapperObj[handler.name].__r2_add_lines = [...(wrapperObj[handler.name].__r2_add_lines || []), getProjectLines()];
 
 	if (handler.name === "router") Object.assign(wrapperObj[handler.name], handler);

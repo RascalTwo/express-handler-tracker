@@ -19,7 +19,7 @@ const startSSEPiping = async () => {
 
 
 		const holding = [];
-		const now = Date.now();
+		const now = performance.now();
 		for (const chunks of Object.values(chunksByRequests)) {
 			const latest = chunks[0];
 			if (now - latest.event.end <= MIDDLEWARE_WAIT_TIME * 2) {

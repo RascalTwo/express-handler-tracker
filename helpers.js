@@ -25,7 +25,7 @@ function getProjectLines(error) {
 		Error.captureStackTrace(container)
 		Error.stackTraceLimit = oldLimit;
 	}
-	for (const line of container.stack.split('at ').slice(1)) {
+	for (const line of (container.stack || '').split('at ').slice(1)) {
 		const source = line.split('(').slice(1).join('(').split(')').slice(0, -1).join(')') || line
 		if (IGNORED_STACK_SOURCES.some(ignore => source.includes(ignore))) continue;
 		lines.push(source.trim())
@@ -38,6 +38,7 @@ function getLinesFromFilepathWithLocation(path) {
 	const filepath = path.split(':').slice(0, -2).join(':')
 	const lines = path.split(':').slice(-2)[0];
 	const [start, end = start + 1] = lines.split('-').map(Number);
+	if (!fs.existsSync(filepath)) return undefined;
 	return fs.readFileSync(filepath).toString().split('\n').slice(Math.max(0, start - 2), end);
 }
 
@@ -56,22 +57,24 @@ async function normalizeEvent(event, previousEvents) {
 
 
 function getHandlerInfo(handler, previousHandlers) {
-	const location = FUNCTION_LOCATIONS.get(handler)
 	const obj = {
 		name: handler.name,
 		adds: handler.__r2_add_lines,
 		construct: handler.__r2_construct_lines,
-		location,
 		code: {
 			adds: handler.__r2_add_lines?.length ? getLinesFromFilepathWithLocation(handler.__r2_add_lines[0][0]) : undefined,
 			construct: handler.__r2_construct_lines ? getLinesFromFilepathWithLocation(handler.__r2_construct_lines[0]) : undefined,
-			location: location ? getLinesFromFilepathWithLocation(`${location.path}:${location.line}-${location.line + handler.toString().split('\n').length}:${location.column}`) : undefined,
 		}
 	};
-	if (IGNORED_STACK_SOURCES.some(ignore => obj.location?.path.includes(ignore))) {
-		delete obj.location;
-		delete obj.code.location;
-	}
+	(FUNCTION_LOCATIONS.has(handler) || handler.__r2_location ? Promise.resolve(FUNCTION_LOCATIONS.get(handler) || handler.__r2_location) : funcLoc.locate(handler).then(loc => FUNCTION_LOCATIONS.set(handler, loc).get(handler))).then(loc => {
+		if (handler.name === 'redirectPartialOAuthUsers') console.log(handler, loc);
+		if (!loc || IGNORED_STACK_SOURCES.some(ignore => loc.path.includes(ignore))) return
+
+		obj.location = loc
+
+		if (!('code' in obj)) obj.code = {};
+		obj.code.location = getLinesFromFilepathWithLocation(`${loc.path}:${loc.line}-${loc.line + handler.toString().split('\n').length}:${loc.column}`)
+	});
 
 	if (!Object.values(obj.code).filter(Boolean).length) delete obj.code;
 	return obj;

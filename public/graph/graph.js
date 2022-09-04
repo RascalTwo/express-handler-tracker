@@ -132,6 +132,7 @@ function parseStyleRules() {
 		pattern: row.querySelector('input').value,
 		color: row.querySelector('input[type="color"]').value,
 		shape: row.querySelector('select').value,
+		// TODO - handle EJS error
 	}));
 }
 
@@ -661,15 +662,15 @@ function generateEventLabel(event) {
 		if (event.handler.name === 'router'){
 			const constructFilename = event.handler.construct?.[0].replace(root, '').split(':').slice(0, -2)
 			const routeAddedTo = (event.handler?.code?.adds?.[1].match(/use\(('|"|`)(.*?)\1/i) || { 2: '' })[2]
-			return [routeAddedTo && `"${routeAddedTo}"` || '', constructFilename].join(' ');
+			label = [routeAddedTo && `"${routeAddedTo}"` || '', constructFilename].join(' ');
 		} else label = event.handler.name ? `${event.handler.name}()` : '<anonymous>'
 	}
 	else if (event.type === 'redirect') label = `Redirect to ${event.path}`
 	else if (event.type === 'view') label = viewsDirectory + `/` + event.name
 	else if (event.type === 'send') label = 'response.send()'
 	else if (event.type === 'json') label = 'response.json()'
-	label += ' - ' + (event.end - event.start) + 'ms'
-	if (event.type === 'finish') label = `Finished in ${event.end - currentRequest.events[0].start} ms`
+	label += ' - ' + (event.end - event.start).toFixed(2) + 'ms'
+	if (event.type === 'finish') label = `Finished in ${(event.end - currentRequest.events[0].start).toFixed(2)} ms`
 	return label
 }
 

@@ -42,51 +42,7 @@ server.get('/reset', (request, response) => {
 
 server.get('/requests', function sendRequests(_, response){
 	response.set('Content-Type', 'application/json');
-
-	// Array of locate promises
-	const locates = [];
-
-	Flatted.stringify(Object.fromEntries(REQUESTS.entries()), (key, value) => {
-		if (key === 'handler' && typeof value === 'function') {
-			// All unseen functions get a new locate function created that sets the value in the map when completed
-			if (!FUNCTION_LOCATIONS.has(value)) {
-				FUNCTION_LOCATIONS.set(value, null);
-				locates.push(funcLoc.locate(value).then(loc => FUNCTION_LOCATIONS.set(value, loc)).catch(() => undefined));
-			}
-			return value;
-		}
-		return value;
-	});
-
-	return Promise.all(locates).then(() => {
-		for (const value of REQUESTS.values()) {
-			for (const [i, event] of value.events.entries()) {
-				if (typeof event.handler !== 'function') continue;
-				// THIS MUTATES THE REQUESTS PERM
-				event.handler = getHandlerInfo(event.handler, value.events.filter(e => e.handler && e.order < event.order).map(e => e.handler));
-				/*
-				if (event.handler.adds?.length <= 1) continue;
-				const possible = event.handler.adds;
-				for (let j = i - 1; j >= 0; j--){
-					const prevHandler = value.events[j].handler;
-					if (!prevHandler) continue
-
-					const against = [...prevHandler.adds, [prevHandler.construct]]
-					const hits = new Map();
-					for (const [k, lines] of possible.entries()){
-						let count = 0;
-						for (const line of lines){
-							for (const other of against){
-								if (other.includes(line)) count++
-							}
-						}
-						hits.set(k, count)
-					}
-				}*/
-			}
-		}
-		response.send(Flatted.stringify(Object.fromEntries(REQUESTS.entries())));
-	})
+	response.send(Flatted.stringify(Object.fromEntries(REQUESTS.entries())));
 });
 
 module.exports = server
