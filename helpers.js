@@ -1,7 +1,8 @@
 const fs = require('fs');
 
 const jestDiff = require('jest-diff');
-const structuredClone = require('@ungap/structured-clone').default;
+const deserialize = require('@ungap/structured-clone').deserialize;
+const serialize = require('./serialize');
 
 const funcLoc = require('func-loc');
 
@@ -124,7 +125,7 @@ function cloneButIgnore(obj, ignoredProperties, ...cloneArgs) {
 		if (!ignoredProperties.some(regex => regex.test(key))) shallow[key] = obj[key];
 	}
 
-	return structuredClone(shallow, { lossy: true });
+	return deserialize(serialize(shallow, { json: true }));
 }
 
 function clone(object) {
