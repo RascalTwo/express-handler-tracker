@@ -414,14 +414,25 @@ session.on('Debugger.paused', ({ params: { callFrames } }) => {
 
 const proxied = {};
 
-module.exports.proxyInstrument = function (obj, label, properties) {
+module.exports.proxyInstrument = function (obj, label, properties = []) {
 	obj.__r2_source = getProjectLines()[0];
 	obj.__r2_id = performance.now();
 	obj.__r2_label = label;
+
+	Object.setPrototypeOf(obj.prototype, new Proxy(Object.getPrototypeOf(obj.prototype), {
+		get(target, property, receiver) {
+			if (properties.length ? properties.includes(property) : true) {
+				stack.unshift({ when: performance.now(), property, id: obj.__r2_id });
+				send('Debugger.pause');
+			}
+			return Reflect.get(target, property, receiver);
+		}
+	}));
+
 	const proxy = new Proxy(obj, {
 		get(target, property, receiver) {
 			if (properties.length ? properties.includes(property) : true) {
-				stack.unshift({ when: performance.now(), property, id: target.__r2_id });
+				stack.unshift({ when: performance.now(), property, id: obj.__r2_id });
 				send('Debugger.pause');
 			}
 			return Reflect.get(target, property, receiver);
