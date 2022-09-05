@@ -2,29 +2,13 @@
 
 const fs = require('fs');
 const childProcess = require('child_process');
-const util = require('util');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
 const { cruise } = require("dependency-cruiser");
 const { diff } = require('jest-diff');
 
+const replacers = require('./replacers');
 
-// Uninstrumented `const app = express()` variations, extract `const`, `app`, and `express()`
-const SERVER_UNINSTRUMENTED_REGEX = /(?<declarationKeyword>const|var|let)? ?(?<variable>.*?) ?= ?(?<value>require\((?<quote>'|"|`)express\4\)\(\)|express\(\));?/ig;
-
-// Instrumented `const app = require('@rascal_two/express-handler-tracker')(express(), )`, extract `const`, `app`, and `express()`
-const SERVER_INSTRUMENTED_REGEX = /(?<declarationKeyword>const|var|let)? ?(?<variable>.*?) ?= ?require\((?<quote>'|"|`).*?\4\)\((?<value>.*?),[\s\S]*?\);?/ig
-// Detection of multiline instrumentation
-const MULTILINE_INSTRUMENTED_REGEX = /\/\/ Begin `express-handler-tracker` instrumentation[\s\S]*?\/\/ End `express-handler-tracker` instrumentation/ig
-
-// Parsing of multiline instrumentation, extract `const`, `app`, and `express()`
-const SERVER_MULTILINE_INSTRUMENTED_REGEX = /\/\/ Begin `express-handler-tracker` instrumentation\n.*?\n(?<declarationKeyword>const|var|let)? ?(?<variable>.*?) ?= ?(?<value>require\((?<quote>'|"|`)express\4\)\(\)|express\(\));?\n.*?\n.*?\n.*?\/\/ End `express-handler-tracker` instrumentation/ig
-
-// Uninstrumented `const router = express.Router()` variations, extract `const`, `router`, and `express.Router()`
-const ROUTER_UNINSTRUMENTED_REGEX = /(?<declarationKeyword>const|var|let)? ?(?<variable>.*?) ?= ?(?<value>.*?router.*?\(\));?/ig;
-
-// Instrumented `const app = require('@rascal_two/express-handler-tracker')(express.Router())`, extract `const`, `app`, and `express.Router()`
-const ROUTER_INSTRUMENTED_REGEX = /(?<declarationKeyword>const|var|let)? ?(?<variable>.*?) ?= ?require\((?<quote>'|"|`).*?\4\)\((?<value>.*?router.*?\(\))\);?/ig
 
 // Attempt to guess default entry point based on current working directory
 const defaultEntryPoint = (() => {
@@ -62,7 +46,7 @@ const getArgv = rawArgv => yargs(hideBin(rawArgv))
 		description: 'Route to expose EHT server in existing Express Application'
 	})
 	.option('yesToAll', { type: 'boolean', description: 'Approve of all changes without prompt' })
-	.option('package', { type: 'boolean', description: 'Automatically install/remove package from project'})
+	.option('package', { type: 'boolean', description: 'Automatically install/remove package from project' })
 	.command('instrument', 'Instrument code')
 	.command('deinstrument', 'Remove instrumentation from code')
 	.strictCommands()
@@ -97,79 +81,20 @@ function collectFilepaths(modules) {
 }
 
 // Generate string replacements for instrumentation
-function generateInstrumentReplacements(content){
-	let options = {
-		entryPoint: argv.entryPoint,
-		port: argv.port,
-		diffExcludedProperties: argv.diffExcludedProperties
-	}
-	for (const key in options) if (options[key] === undefined) delete options[key]
-	if (!Object.keys(options).length) options = undefined;
-
-	const optionsString = options ? ', ' + util.inspect(options, { depth: null }) : ''
-
-
+function collectInstrumentReplacements(content) {
 	const replacements = []
-	for (const match of [...content.matchAll(SERVER_UNINSTRUMENTED_REGEX)].reverse()){
-		const start = match.index, end = start + match[0].length
-		let alreadyDone = false;
-		for (const alreadyInstrumented of content.matchAll(MULTILINE_INSTRUMENTED_REGEX)){
-			const alreadyStart = alreadyInstrumented.index, alreadyEnd = alreadyStart + alreadyInstrumented[0].length;
-			if (start >= alreadyStart && start <= alreadyEnd && end >= alreadyStart && end <= alreadyEnd) {
-				alreadyDone = true;
-				break;
-			}
-		}
-		// Don't perform instrumentation to already-instrumented multiline instrumentation
-		if (alreadyDone) continue
-		const { declarationKeyword, variable, value, quote = "'" } = match.groups;
-		let replacement = '';
-		if (argv.subRoute) {
-			replacement = [
-				'// Begin `express-handler-tracker` instrumentation',
-				`const instrumentor = require(${quote}@rascal_two/express-handler-tracker${quote});`,
-				`${!declarationKeyword || declarationKeyword === 'const' ? 'let' : declarationKeyword} ${variable} = ${value};`,
-				`${variable}.use(${quote}${argv.subRoute}${quote}, instrumentor.server);`,
-				`${variable} = instrumentor(${variable}${optionsString});`,
-				'// End `express-handler-tracker` instrumentation',
-			].join('\n')
-		} else {
-			replacement = `${declarationKeyword ? declarationKeyword + ' ' : ''}${variable} = require(${quote}@rascal_two/express-handler-tracker${quote})(${value}${optionsString});`
-		}
-		replacements.push({ start, end, replacement });
-	}
-	for (const match of [...content.matchAll(ROUTER_UNINSTRUMENTED_REGEX)].reverse()){
-		if (match[0].includes('@rascal_two/express-handler-tracker')) continue
-		const { declarationKeyword, variable, value } = match.groups;
-		replacements.push({ start: match.index, end: match.index + match[0].length, replacement: `${declarationKeyword ? declarationKeyword + ' ' : ''}${variable} = require('@rascal_two/express-handler-tracker')(${value});` });
-	}
+	for (const { instrument } of Object.values(replacers)) replacements.push(...instrument(content, argv));
 	return replacements;
 }
 
 // Generate string replacements for deinstrumentation
-function generateDeinstrumentReplacements(content){
+function collectDeinstrumentReplacements(content) {
 	const replacements = []
-	for (const match of [...content.matchAll(SERVER_INSTRUMENTED_REGEX), ...content.matchAll(SERVER_MULTILINE_INSTRUMENTED_REGEX)].reverse()){
-		const { declarationKeyword, variable, value } = match.groups;
-		replacements.push({
-			start: match.index,
-			end: match.index + match[0].length,
-			replacement: `${declarationKeyword ? declarationKeyword + ' ' : ''}${variable} = ${value};`
-		});
-	}
-	for (const match of [...content.matchAll(ROUTER_INSTRUMENTED_REGEX)].reverse()){
-		const { declarationKeyword, variable, value } = match.groups;
-		replacements.push({
-			start: match.index,
-			end: match.index + match[0].length,
-			replacement: `${declarationKeyword ? declarationKeyword + ' ' : ''}${variable} = ${value};`
-		});
-	}
-
+	for (const { deinstrument } of Object.values(replacers)) replacements.push(...deinstrument(content, argv));
 	return replacements;
 }
 
-async function performReplacements(generateFunction){
+async function performReplacements(generateFunction) {
 	const chalk = await import('chalk').then(module => module.default)
 
 	for (const filepath of new Set(collectFilepaths(cruise([argv.entryPoint], { doNotFollow: { path: 'node_modules' }, exclude: ['node_modules', 'express-handler-tracker'] }).output.modules))) {
@@ -178,7 +103,7 @@ async function performReplacements(generateFunction){
 		if (!replacements.length) continue;
 		let newFile = oldFile;
 		replacements.sort((a, b) => b.start - a.start)
-		for (const { start, end, replacement } of replacements){
+		for (const { start, end, replacement } of replacements) {
 			newFile = newFile.substring(0, start) + replacement + newFile.substring(end);
 		}
 		console.log(chalk.yellow(`Proposed changes to ${filepath}\n`) + diff(oldFile, newFile,
@@ -199,21 +124,21 @@ async function performReplacements(generateFunction){
 }
 
 
-function spawnPipedCommand(command, ...args){
+function spawnPipedCommand(command, ...args) {
 	const child = childProcess.spawn(command, args);
 	child.stdout.pipe(process.stdout);
 	child.stderr.pipe(process.stderr);
 	return child;
 }
 
-async function instrument(){
-	await performReplacements(generateInstrumentReplacements)
+async function instrument() {
+	await performReplacements(collectInstrumentReplacements)
 
 	if (argv.package) spawnPipedCommand('npm', 'install', 'https://github.com/RascalTwo/expess-handler-tracker');
 }
 
-async function deinstrument(){
-	await performReplacements(generateDeinstrumentReplacements)
+async function deinstrument() {
+	await performReplacements(collectDeinstrumentReplacements)
 
 	if (argv.package) spawnPipedCommand('npm', 'uninstall', 'https://github.com/RascalTwo/expess-handler-tracker');
 }
