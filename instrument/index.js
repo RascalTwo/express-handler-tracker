@@ -47,6 +47,13 @@ const getArgv = rawArgv => yargs(hideBin(rawArgv))
 	})
 	.option('yesToAll', { type: 'boolean', description: 'Approve of all changes without prompt' })
 	.option('package', { type: 'boolean', description: 'Automatically install/remove package from project' })
+	.option('replacers', { type: 'array', description: 'Replacers to process the code:\n' + Object.entries(replacers).map(([name, { description }]) => `- ${name}: ${description}`).join('\n') })
+	.check(argv => {
+		if (argv.replacers?.some(arg => !(arg in replacers))){
+			throw new Error(`Only [${Object.keys(replacers).join(', ')}] are allowed as replacers`)
+		}
+		return true;
+	})
 	.command('instrument', 'Instrument code')
 	.command('deinstrument', 'Remove instrumentation from code')
 	.strictCommands()
@@ -80,17 +87,19 @@ function collectFilepaths(modules) {
 		])
 }
 
+const getSelectedReplacers = () => argv.replacers?.length ? argv.replacers.map(name => replacers[name]) : Object.values(replacers)
+
 // Generate string replacements for instrumentation
 function collectInstrumentReplacements(content) {
 	const replacements = []
-	for (const { instrument } of Object.values(replacers)) replacements.push(...instrument(content, argv));
+	for (const { instrument } of getSelectedReplacers()) replacements.push(...instrument(content, argv));
 	return replacements;
 }
 
 // Generate string replacements for deinstrumentation
 function collectDeinstrumentReplacements(content) {
 	const replacements = []
-	for (const { deinstrument } of Object.values(replacers)) replacements.push(...deinstrument(content, argv));
+	for (const { deinstrument } of getSelectedReplacers()) replacements.push(...deinstrument(content, argv));
 	return replacements;
 }
 

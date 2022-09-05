@@ -30,5 +30,6 @@ module.exports = {
 		}
 
 		return replacements
-	}
+	},
+	description: 'Express Routers'
 }
