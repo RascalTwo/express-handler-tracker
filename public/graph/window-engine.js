@@ -31,6 +31,7 @@ function createWindow(id) {
 
     document.getElementById("closeButton" + id).onclick = function () {
         fadeOut(windowID);
+        document.getElementById("button" + id).className = '';
     };
     document.getElementById("button" + id).onclick = function () {
         const opening = windowID.style.display !== "initial";
@@ -148,8 +149,11 @@ function fadeOut(elmnt) {
 function activeWindow(elmnt) {
     for (let i = active.length - 1; i > -1; i--) {
         active[i].classList.remove("windowActive");
-        elmnt.className += " windowActive";
     }
-    document.querySelectorAll('[id^="button"]').forEach(b => b.classList.remove('btn-secondary'))
-    document.querySelector(`#button${elmnt.id.split('window')[1]}`).classList.add('btn-secondary')
+    elmnt.classList.add("windowActive");
+    setTimeout(() => {
+        document.querySelectorAll('[id^="button"]').forEach(b => b.classList.remove('btn-secondary'))
+        if (elmnt.style.display === "none") return;
+        document.querySelector(`#button${elmnt.id.split('window')[1]}`).classList.add('btn-secondary')
+    }, 500)
 }

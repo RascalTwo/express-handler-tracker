@@ -30,12 +30,9 @@ pre {
 	background-color: rgb(0, 85, 0);
 }
 
-.windowActive {
-	resize: both;
-}
-
 .window {
 	overflow: scroll;
+	resize: both;
 }
 
 html.dark .window {
