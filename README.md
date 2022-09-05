@@ -4,8 +4,6 @@
 
 Tracks activities your Express application does - middlewares, responses, etc - allowing you to visualize all of these events and changes in a network graph, for both debugging and architectural understanding.
 
-> Despite being able to collect a large deal of information statically, this is not a static-analysis tool, views for example need to be evaluated in order to be rendered.
-
 ## Quickstart
 
 ```shell
@@ -28,6 +26,8 @@ npm install https://github.com/RascalTwo/expess-handler-tracker
 Your Express application & any routers must be instrumented, actual application instrumentation only requires a single configurable: the entry point of your application.
 
 This is the first file that dependency graphing should start from.
+
+> In addition, anything that exists within the request lifecycle can me [Proxy Instrumented](#express-handler-tracker).
 
 ### Automatic Instrumentation
 
@@ -129,6 +129,21 @@ app.use(middlewareFunction);
 app = require('@rascal_two/express-handler-tracker')(app, { entryPoint: 'index.js' });
 // Will not be able to track `middlewareFunction`
 ```
+
+#### Proxy Instrumentation
+
+It's possible to instrument any object that is in the request lifecycle - is accessed after a request has been made.
+
+Take Mongoose Models for example:
+
+```javascript
+// Before
+module.exports = mongoose.model('List', new mongoose.Schema({ ... }))
+/// After
+module.exports = require('@rascal_two/express-handler-tracker').proxyInstrument(mongoose.model('List', new mongoose.Schema({ ... })), 'List', ['find', 'updateOne', 'deleteOne']);
+```
+
+The `proxyInstrument` method takes the object to be instrumented, the label of the object, and all properties of the object to be instrumented - if an empty array is passed, then every property will be instrumented.
 
 ## Troubleshooting
 

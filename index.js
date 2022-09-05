@@ -1,4 +1,6 @@
 const util = require('util');
+const path = require('path');
+const inspector = require("inspector");
 
 const httpMethods = require("methods")
 const { terminalCodesToHtml } = require("terminal-codes-to-html");
@@ -146,6 +148,8 @@ const returnHandler = (method, handler) => args => {
 	let start;
 
 	function before(error, request, response, next, paramValue) {
+		if (!request.__r2_proxies) request.__r2_proxies = [];
+
 		for (const key in requestChanges) {
 			if (!(key in request)) request[key] = requestChanges[key](request, response);
 		}
@@ -163,6 +167,28 @@ const returnHandler = (method, handler) => args => {
 	}
 
 	function after(error, request, response, next, paramValue, realEnd) {
+		if (request.__r2_proxies.length) {
+			const count = request.__r2_proxies.length;
+			const proxies = [...request.__r2_proxies];
+			request.__r2_proxies.splice(0, count);
+			for (const { info: { when, id, property }, url, location } of proxies) {
+				const line = url ? (url.split('file://')[1] + ':' + (location.lineNumber + 1) + ':' + (location.columnNumber + 1)) : undefined;
+				const { __r2_source: source, __r2_label: label } = proxied[id].obj
+				addRequestData(request, {
+					start: when,
+					end: performance.now(),
+					type: 'proxy-evaluate',
+					property,
+					evaluate: line ? {
+						lines: [line],
+						code: getLinesFromFilepathWithLocation(line)
+					} : undefined,
+					source,
+					label,
+					code: getLinesFromFilepathWithLocation(source)
+				});
+			}
+		}
 
 		if (handler.__r2_wrapper) {
 			const info = REQUESTS.get(request.__r2_id)
@@ -341,5 +367,73 @@ module.exports = wrapInstance;
 module.exports.server = server;
 
 
+
+const session = new inspector.Session();
+session.connect();
+const send = util.promisify(session.post).bind(session);
+
+const expressionTemplate = `
+const event = EVENT;
+typeof request === 'object' && request.__r2_proxies
+	? request.__r2_proxies.push(event)
+	: typeof req === 'object' && req.__r2_proxies
+		? req.__r2_proxies.push(event)
+		: typeof r === 'object' && r.__r2_proxies
+			? r.__r2_proxies.push(event)
+			: false;
+`.trim();
+
+const stack = [];
+
+let paused = false;
+session.on('Debugger.resumed', () => paused = false)
+// Keep this callback as fast as possible, evaluateOnCallFrame can't be executed if the debugger unpauses which cannot be halted
+session.on('Debugger.paused', ({ params: { callFrames } }) => {
+	paused = true;
+
+	const root = 'file://' + path.dirname(path.resolve(SETTINGS.entryPoint)) + '/';
+
+	const possibles = []
+	let evaluated;
+	for (const frame of callFrames) {
+		if (!frame.url.startsWith(root)) continue;
+		if (!frame.url.includes('node_modules')) evaluated = frame;
+		possibles.push(frame);
+	}
+
+	const expression = expressionTemplate.replace(/EVENT/g, util.inspect({ info: stack.pop(), location: evaluated?.location, url: evaluated?.url }, { depth: null }));
+	(async () => {
+		for (let i = possibles.length - 1; i >= 0; i--) {
+			if (!paused) continue;
+			if ((await send('Debugger.evaluateOnCallFrame', {
+				callFrameId: possibles[i].callFrameId, expression
+			})).result.type === 'number') break
+		}
+	})();
+});
+
+const proxied = {};
+
+module.exports.proxyInstrument = function (obj, label, properties) {
+	obj.__r2_source = getProjectLines()[0];
+	obj.__r2_id = performance.now();
+	obj.__r2_label = label;
+	const proxy = new Proxy(obj, {
+		get(target, property, receiver) {
+			if (properties.length ? properties.includes(property) : true) {
+				stack.unshift({ when: performance.now(), property, id: target.__r2_id });
+				send('Debugger.pause');
+			}
+			return Reflect.get(target, property, receiver);
+		}
+	})
+	proxied[obj.__r2_id] = { obj, proxy };
+	return proxy;
+}
+
+
 if (require.main === module) require('./instrument')
-else startSSE()
+else {
+	send('Runtime.enable').then(() => send('Debugger.enable', { maxScriptsCacheSize: 100000000 }));
+	startSSE();
+}

@@ -19,8 +19,10 @@ export function generateEventURLs(event) {
 		added: event.handler && `vscode://file${event.handler.adds[0][0]}`,
 		evaluated: event.evaluate?.lines && `vscode://file${event.evaluate.lines[0]}`,
 		construct: event.handler?.construct && `vscode://file${event.handler.construct[0]}`,
-		source: event.handler?.location ? `vscode://file${event.handler.location.path}:${event.handler.location.line}:${event.handler.location.column}` : event.source_line && `vscode://file${event.source_line}`,
-		error: event.error?.lines.length ? `vscode://file${event.error?.lines[0]}` : undefined
+		source: event.handler?.location
+			? `vscode://file${event.handler.location.path}:${event.handler.location.line}:${event.handler.location.column}`
+			: event.source && `vscode://file${event.source}`,
+		error: event.error?.lines.length ? `vscode://file${event.error?.lines[0]}` : undefined,
 	}
 }
 
@@ -31,8 +33,8 @@ export function generateEventCodeHTML(event) {
 		added: event.handler?.code?.adds,
 		evaluated: event.evaluate?.code,
 		construct: event.handler?.code?.construct,
-		source: event.handler?.code?.location,
-		error: event.error?.code
+		source: event.handler?.code?.location || event.code,
+		error: event.error?.code,
 	}).filter(([_, code]) => code))
 
 	let allLines = [];
@@ -59,6 +61,7 @@ export function generateEventLabel(event) {
 	else if (event.type === 'view') label = views.directory + `/` + generateViewName(event.name)
 	else if (event.type === 'send') label = 'response.send()'
 	else if (event.type === 'json') label = 'response.json()'
+	else if (event.type === 'proxy-evaluate') label = `${event.label}.${event.property}(...)`;
 	label += ' - ' + (event.end - event.start).toFixed(2) + 'ms'
 	if (event.type === 'finish') label = `Finished in ${(event.end - renderInfo.request.events[0].start).toFixed(2)} ms`
 	return label
