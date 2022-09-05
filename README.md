@@ -7,13 +7,26 @@ Tracks activities your Express application does - middlewares, responses, etc - 
 ## Quickstart
 
 ```shell
-$ npm install https://github.com/RascalTwo/expess-handler-tracker
-$ npx https://github.com/RascalTwo/expess-handler-tracker instrument --port=1338
+$ npx https://github.com/RascalTwo/expess-handler-tracker instrument --port=1338 --package
 > ...
 > Changes made
 $ npm run start
 > EHT available at http://localhost:1338/
 ```
+
+<details>
+  <summary>Without NPX Usage</summary>
+
+  ```shell
+  $ npm install https://github.com/RascalTwo/expess-handler-tracker
+  $ node node_modules/.bin/express-handler-tracker instrument --port=1338
+  > ...
+  > Changes made
+  $ npm run start
+  > EHT available at http://localhost:1338/
+  ```
+
+</details>
 
 ## Installation
 

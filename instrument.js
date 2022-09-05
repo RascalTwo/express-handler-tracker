@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 const fs = require('fs');
-const path = require('path');
+const childProcess = require('child_process');
 const util = require('util');
 const yargs = require('yargs/yargs');
 const { hideBin } = require('yargs/helpers');
@@ -62,6 +62,7 @@ const getArgv = rawArgv => yargs(hideBin(rawArgv))
 		description: 'Route to expose EHT server in existing Express Application'
 	})
 	.option('yesToAll', { type: 'boolean', description: 'Approve of all changes without prompt' })
+	.option('package', { type: 'boolean', description: 'Automatically install/remove package from project'})
 	.command('instrument', 'Instrument code')
 	.command('deinstrument', 'Remove instrumentation from code')
 	.strictCommands()
@@ -197,14 +198,34 @@ async function performReplacements(generateFunction){
 	}
 }
 
+
+function spawnPipedCommand(command, ...args){
+	const child = childProcess.spawn(command, args);
+	child.stdout.pipe(process.stdout);
+	child.stderr.pipe(process.stderr);
+	return child;
+}
+
+async function instrument(){
+	await performReplacements(generateInstrumentReplacements)
+
+	if (argv.package) spawnPipedCommand('npm', 'install', 'https://github.com/RascalTwo/expess-handler-tracker');
+}
+
+async function deinstrument(){
+	await performReplacements(generateDeinstrumentReplacements)
+
+	if (argv.package) spawnPipedCommand('npm', 'uninstall', 'https://github.com/RascalTwo/expess-handler-tracker');
+}
+
 if (argv._[0] === 'instrument') {
 	// If no port && no subRoute, prevent
 	const noServer = !argv.port && !argv.subRoute
 	if (noServer) console.error('Neither port or subRoute provided, instrumentation will not result in a running server')
-	if (!noServer || argv.yesToAll) performReplacements(generateInstrumentReplacements).catch(console.error);
+	if (!noServer || argv.yesToAll) instrument().catch(console.error);
 	else process.exit(1)
 }
-else if (argv._[0] === 'deinstrument') performReplacements(generateDeinstrumentReplacements).catch(console.error);
+else if (argv._[0] === 'deinstrument') deinstrument().catch(console.error);
 else {
 	console.error('Missing command');
 	getArgv([...process.argv, '--help'])
