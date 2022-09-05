@@ -143,13 +143,13 @@ function spawnPipedCommand(command, ...args) {
 async function instrument() {
 	await performReplacements(collectInstrumentReplacements)
 
-	if (argv.package) spawnPipedCommand('npm', 'install', 'https://github.com/RascalTwo/expess-handler-tracker');
+	if (argv.package) spawnPipedCommand('npm', 'install', 'https://github.com/RascalTwo/express-handler-tracker');
 }
 
 async function deinstrument() {
 	await performReplacements(collectDeinstrumentReplacements)
 
-	if (argv.package) spawnPipedCommand('npm', 'uninstall', 'https://github.com/RascalTwo/expess-handler-tracker');
+	if (argv.package) spawnPipedCommand('npm', 'uninstall', 'https://github.com/RascalTwo/express-handler-tracker');
 }
 
 if (argv._[0] === 'instrument') {

@@ -24,10 +24,10 @@
   },
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/RascalTwo/expess-handler-tracker.git"
+    "url": "git+https://github.com/RascalTwo/express-handler-tracker.git"
   },
   "bugs": {
-    "url": "https://github.com/RascalTwo/expess-handler-tracker/issues"
+    "url": "https://github.com/RascalTwo/express-handler-tracker/issues"
   },
-  "homepage": "https://github.com/RascalTwo/expess-handler-tracker#readme"
+  "homepage": "https://github.com/RascalTwo/express-handler-tracker#readme"
 }

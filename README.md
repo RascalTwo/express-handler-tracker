@@ -7,7 +7,7 @@ Tracks activities your Express application does - middlewares, responses, etc - 
 ## Quickstart
 
 ```shell
-$ npx https://github.com/RascalTwo/expess-handler-tracker instrument --port=1338 --package
+$ npx https://github.com/RascalTwo/express-handler-tracker instrument --port=1338 --package
 > ...
 > Changes made
 $ npm run start
@@ -18,7 +18,7 @@ $ npm run start
   <summary>Without NPX Usage</summary>
 
   ```shell
-  $ npm install https://github.com/RascalTwo/expess-handler-tracker
+  $ npm install https://github.com/RascalTwo/express-handler-tracker
   $ node node_modules/.bin/express-handler-tracker instrument --port=1338
   > ...
   > Changes made
@@ -33,7 +33,7 @@ $ npm run start
 After installing the package:
 
 ```shell
-npm install https://github.com/RascalTwo/expess-handler-tracker
+npm install https://github.com/RascalTwo/express-handler-tracker
 ```
 
 Your Express application & any routers must be instrumented, actual application instrumentation only requires a single configurable: the entry point of your application.
@@ -47,7 +47,7 @@ This is the first file that dependency graphing should start from.
 There exists a automatic-instrumentation & deinstrumentation script that will attempt to automate this process for you, it can be ran directly:
 
 ```shell
-npx https://github.com/RascalTwo/expess-handler-tracker
+npx https://github.com/RascalTwo/express-handler-tracker
 ```
 
 It has all the options that can be manually crafted:
@@ -79,7 +79,7 @@ Options:
 It will attempt to detect a valid JavaScript file in the current working directory to use as an `entryPoint`, meaning that from your project directory you only need to execute
 
 ```shell
-npx https://github.com/RascalTwo/expess-handler-tracker instrument
+npx https://github.com/RascalTwo/express-handler-tracker instrument
 ```
 
 and approve each of the changes to get started!
@@ -87,7 +87,7 @@ and approve each of the changes to get started!
 > To automatically reverse the process you can use the `deinstrument` subcommand:
 
 ```shell
-npx https://github.com/RascalTwo/expess-handler-tracker deinstrument
+npx https://github.com/RascalTwo/express-handler-tracker deinstrument
 ```
 
 ### Manual Instrumentation
