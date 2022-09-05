@@ -305,10 +305,19 @@ function wrapMethods(instance, isRoute) {
 
 
 function wrapInstance(instance, options = {}) {
-	try {
-		const views = instance.get('views');
-		if (typeof views === 'string') SETTINGS.viewsDirectory = views;
-	} catch (e) { }
+	if (instance.name === 'app'){
+		instance.__r2_set = instance.set;
+		instance.set = function set(...args){
+			const [setting, val] = args;
+			if (typeof val !== 'string') return instance.__r2_set(...args)
+			else if (setting === 'views') SETTINGS.views.directory = val;
+			else if (setting === 'view engine') SETTINGS.views.extension = val;
+			return instance.__r2_set(...args)
+		}
+
+		SETTINGS.views.directory = instance.get('views');
+		SETTINGS.views.extension = instance.get('view engine');
+	}
 
 	if (options.entryPoint) SETTINGS.entryPoint = options.entryPoint
 	if (options.port) {

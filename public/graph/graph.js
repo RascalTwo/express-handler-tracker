@@ -224,7 +224,7 @@ document.querySelector('html').classList.toggle('dark', darkTheme);
 
 
 let requests = await fetch('../requests').then(r => r.text()).then(raw => Flatted.parse(raw));
-let { modules, root, viewsDirectory } = await fetch('../info').then(r => r.json());
+let { modules, root, views } = await fetch('../info').then(r => r.json());
 
 let fails = 1;
 const connectionIndicator = document.querySelector('#connection-indicator');
@@ -279,6 +279,11 @@ function sourceLineToID(objects, fullSrc) {
 	return objects.find(e => e.data.id === src)
 }
 
+function generateViewName(name){
+	const fullExt = '.' + views.extension
+	return name + (name.endsWith(fullExt) ? '' : fullExt)
+}
+
 function generateElements() {
 	const parents = {};
 	const elements = modules.map(mod => {
@@ -301,15 +306,15 @@ function generateElements() {
 			})
 		}
 	}
-	const views = {}
+	const foundViews = {}
 	for (const req of Object.values(requests)) {
 		for (const event of req.events) {
 			if (event.type === 'view') {
 				const caller = sourceLineToID(elements, event.evaluate.lines[0])
-				const id = viewsDirectory + '/' + event.name
-				views[event.name] = {
-					data: { id, label: event.name, parent: compoundNodes && viewsDirectory },
-					classes: 'parent-' + viewsDirectory
+				const id = views.directory + '/' + generateViewName(event.name)
+				foundViews[event.name] = {
+					data: { id, label: generateViewName(event.name), parent: compoundNodes && views.directory },
+					classes: 'parent-' + views.directory
 				}
 				if (caller) {
 					elements.push({ data: { id: `${caller.data.id}-${id}`, source: caller.data.id, target: id, arrow: 'triangle' }, classes: 'group' })
@@ -317,9 +322,9 @@ function generateElements() {
 			}
 		}
 	}
-	if (Object.values(views)) {
-		elements.push(...Object.values(views))
-		if (compoundNodes) elements.push({ data: { id: viewsDirectory, label: viewsDirectory }, classes: `parent-${viewsDirectory} group` })
+	if (Object.values(foundViews)) {
+		elements.push(...Object.values(foundViews))
+		if (compoundNodes) elements.push({ data: { id: views.directory, label: views.directory }, classes: `parent-${views.directory} group` })
 	}
 	elements.push(...Object.values(parents))
 	return elements;
@@ -372,7 +377,7 @@ function renderBubbles() {
 	const ids = new Set();
 	for (const event of currentRequest.events) {
 		const urls = generateEventURLs(event)
-		const remaining = [...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse(), ...(event.type === 'view' ? [viewsDirectory + '/' + event.name] : [])];
+		const remaining = [...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse(), ...(event.type === 'view' ? [views.directory + '/' + generateViewName(event.name)] : [])];
 
 		for (const url of remaining) {
 			const target = sourceLineToID(Object.values(cy.elements()).map(cye => {
@@ -490,7 +495,7 @@ function generateEventNodes(event, forward) {
 	const nodes = [];
 
 	const urls = generateEventURLs(event)
-	const remaining = [...(event.type === 'view' ? [viewsDirectory + '/' + event.name] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse()];
+	const remaining = [...(event.type === 'view' ? [views.directory + '/' + generateViewName(event.name)] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse()];
 	if (!forward) remaining.reverse();
 
 	while (remaining.length) {
@@ -538,7 +543,7 @@ async function renderMiddleware() {
 	}
 
 	const urls = generateEventURLs(event)
-	const remaining = [...(event.type === 'view' ? [viewsDirectory + '/' + event.name] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse()];
+	const remaining = [...(event.type === 'view' ? [views.directory + '/' + generateViewName(event.name)] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse()];
 	if (!forward) remaining.reverse()
 
 	const w5 = document.querySelector('#window5 pre')
@@ -666,7 +671,7 @@ function generateEventLabel(event) {
 		} else label = event.handler.name ? `${event.handler.name}()` : '<anonymous>'
 	}
 	else if (event.type === 'redirect') label = `Redirect to ${event.path}`
-	else if (event.type === 'view') label = viewsDirectory + `/` + event.name
+	else if (event.type === 'view') label = views.directory + `/` + generateViewName(event.name)
 	else if (event.type === 'send') label = 'response.send()'
 	else if (event.type === 'json') label = 'response.json()'
 	label += ' - ' + (event.end - event.start).toFixed(2) + 'ms'

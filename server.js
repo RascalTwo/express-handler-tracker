@@ -1,16 +1,16 @@
 const path = require('path')
+const fs = require('fs')
 
 const express = require('express');
 const cors = require('cors');
 const Flatted = require('flatted')
 const { cruise } = require("dependency-cruiser");
-const funcLoc = require('func-loc')
 
-const { SETTINGS, REQUESTS, FUNCTION_LOCATIONS } = require('./globals')
+const { SETTINGS, REQUESTS } = require('./globals')
 
 const { handleSSERequests } = require('./sse')
-const { getHandlerInfo } = require('./helpers')
 
+let cruiseModules;
 
 const server = express();
 server.use(cors());
@@ -23,12 +23,32 @@ server.get('/graph', function renderGraphPage(_, response){
 	response.sendFile(path.join(__dirname, 'public/graph/graph.html'))
 });
 server.get('/info', function sendDependencyInfo(_, response){
-	const { output: { modules } } = cruise([SETTINGS.entryPoint], { exclude: ['node_modules', 'express-handler-tracker'] });
 	const root = path.dirname(path.resolve(SETTINGS.entryPoint)) + '/'
+	const viewsRelativeDirectory = path.relative(root, SETTINGS.views.directory)
+
+	if (!cruiseModules) {
+		const fullExt = '.' + SETTINGS.views.extension
+		const addExtIfMissing = name => name + (name.endsWith(fullExt) ? '' : fullExt)
+		const { output: { modules } } = cruise([SETTINGS.entryPoint], { exclude: ['node_modules', 'express-handler-tracker'] });
+		cruiseModules = modules.map(({ source, dependencies }) => ({ source, dependencies: dependencies.map(({ resolved }) => resolved) }))
+		for (const module of [...cruiseModules]){
+			const viewNames = [...(fs.readFileSync(path.join(root, module.source)).toString().matchAll(/.*?\.render\(('|")(?<name>.*?)('|")(,|\))/gi) || [])]
+				.map(match => path.join(
+					viewsRelativeDirectory,
+					addExtIfMissing(match.groups.name)
+				));
+			module.dependencies.push(...viewNames);
+			cruiseModules.push(...viewNames.map(name => ({ source: name, dependencies: []})));
+		}
+	}
+
 	response.send({
-		modules: modules.map(({ source, dependencies }) => ({ source, dependencies: dependencies.map(({ resolved }) => resolved) })),
+		modules: cruiseModules,
 		root,
-		viewsDirectory: path.relative(root, SETTINGS.viewsDirectory)
+		views: {
+			directory: viewsRelativeDirectory,
+			extension: SETTINGS.views.extension
+		}
 	});
 });
 

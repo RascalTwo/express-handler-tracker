@@ -68,7 +68,6 @@ function getHandlerInfo(handler, previousHandlers) {
 		}
 	};
 	(FUNCTION_LOCATIONS.has(handler) || handler.__r2_location ? Promise.resolve(FUNCTION_LOCATIONS.get(handler) || handler.__r2_location) : funcLoc.locate(handler).then(loc => FUNCTION_LOCATIONS.set(handler, loc).get(handler))).then(loc => {
-		if (handler.name === 'redirectPartialOAuthUsers') console.log(handler, loc);
 		if (!loc || IGNORED_STACK_SOURCES.some(ignore => loc.path.includes(ignore))) return
 
 		obj.location = loc

@@ -11,7 +11,10 @@ const SETTINGS = {
 		'^sessionStore$'
 	].map(s => new RegExp(s)),
 	entryPoint: undefined,
-	viewsDirectory: undefined
+	views: {
+		directory: undefined,
+		extension: undefined
+	}
 }
 
 const REQUESTS = new Map();
