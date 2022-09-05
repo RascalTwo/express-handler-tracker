@@ -1,4 +1,4 @@
-export default {
+export const LAYOUTS = {
 	'dagre-network': ({
 		name: 'dagre',
 		ranker: 'network-simplex'
@@ -106,4 +106,32 @@ export default {
 		},
 		nodeDimensionsIncludeLabels: true,
 	})
+}
+
+export const DEFAULT_STYLE_RULES = {
+	'default-rule': {
+		pattern: '.*',
+		color: '#729fcf',
+		shape: 'ellipse'
+	},
+	'model-rule': {
+		pattern: 'mod(e|a)l',
+		color: '#ff0000',
+		shape: 'barrel'
+	},
+	'view-rule': {
+		pattern: 'view',
+		color: '#0000ff',
+		shape: 'vee'
+	},
+	'controller-rule': {
+		pattern: 'controll?er',
+		color: '#00ff00',
+		shape: 'rhomboid'
+	},
+	'router-rule': {
+		pattern: 'route',
+		color: '#ffff00',
+		shape: 'concave-hexagon'
+	}
 }
