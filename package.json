@@ -5,7 +5,7 @@
   "main": "index.js",
   "author": "Rascal_Two <therealrascaltwo@gmail.com>",
   "license": "ISC",
-  "bin": "instrument.js",
+  "bin": "instrument/index.js",
   "dependencies": {
     "@ungap/structured-clone": "^1.0.1",
     "chalk": "^5.0.1",
