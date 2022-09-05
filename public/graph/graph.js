@@ -441,39 +441,12 @@ function disableButtons() {
 
 renderRequest()
 
-const observer = new MutationObserver(mutations => {
-	for (const { target: w } of mutations) {
-		localStorage.setItem(`${w.id}-style`, w.getAttribute('style'));
-	}
-})
-document.querySelectorAll('.window').forEach(w => observer.observe(w, { attributeFilter: ['class'] }))
-
 /*
 document.getElementById("save").addEventListener("click", function () {
 	window.localStorage.setItem("cy-elements", JSON.stringify(cy.json()));
 	alert('Graph Layout save to Local Storage')
 });
 */
-
-document.querySelector('#window1').setAttribute('style', window.localStorage.getItem("window1-style") || '');
-document.querySelector('#window2').setAttribute('style', window.localStorage.getItem("window2-style") || '');
-document.querySelector('#window3').setAttribute('style', window.localStorage.getItem("window3-style") || '');
-document.querySelector('#window4').setAttribute('style', window.localStorage.getItem("window4-style") || '');
-document.querySelector('#window5').setAttribute('style', window.localStorage.getItem("window5-style") || '');
-document.querySelector('#window6').setAttribute('style', window.localStorage.getItem("window6-style") || '');
-document.querySelector('#button1').className = +document.querySelector('#window1').style.opacity ? 'btn-success' : ''
-document.querySelector('#button2').className = +document.querySelector('#window2').style.opacity ? 'btn-success' : ''
-document.querySelector('#button3').className = +document.querySelector('#window3').style.opacity ? 'btn-success' : ''
-document.querySelector('#button4').className = +document.querySelector('#window4').style.opacity ? 'btn-success' : ''
-document.querySelector('#button5').className = +document.querySelector('#window5').style.opacity ? 'btn-success' : ''
-document.querySelector('#button6').className = +document.querySelector('#window6').style.opacity ? 'btn-success' : ''
-
-document.querySelector('#button1').addEventListener('click', () => setTimeout(() => localStorage.setItem(`window1-style`, document.querySelector('#window' + 1).getAttribute('style')), 1000));
-document.querySelector('#button2').addEventListener('click', () => setTimeout(() => localStorage.setItem(`window2-style`, document.querySelector('#window' + 2).getAttribute('style')), 1000));
-document.querySelector('#button3').addEventListener('click', () => setTimeout(() => localStorage.setItem(`window3-style`, document.querySelector('#window' + 3).getAttribute('style')), 1000));
-document.querySelector('#button4').addEventListener('click', () => setTimeout(() => localStorage.setItem(`window4-style`, document.querySelector('#window' + 4).getAttribute('style')), 1000));
-document.querySelector('#button5').addEventListener('click', () => setTimeout(() => localStorage.setItem(`window5-style`, document.querySelector('#window' + 5).getAttribute('style')), 1000));
-document.querySelector('#button6').addEventListener('click', () => setTimeout(() => localStorage.setItem(`window6-style`, document.querySelector('#window' + 6).getAttribute('style')), 1000));
 
 /*
 document.getElementById("restore").addEventListener("click", function () {
@@ -485,15 +458,6 @@ document.getElementById("restore").addEventListener("click", function () {
 });
 */
 
-document.querySelector('#reset-windows').addEventListener('click', () => {
-	for (const child of document.querySelector('.windowGroup').children) {
-		child.removeAttribute('style');
-	}
-	for (let i = 1; i <= 6; i++) {
-		document.querySelector('#button' + i).className = '';
-		setTimeout((i) => localStorage.setItem(`window${i}-style`, document.querySelector('#window' + i).getAttribute('style')), 1000, i);
-	}
-})
 
 document.querySelector('#reset-all').addEventListener('click', () => {
 	if (!confirm('Clearing all local settings, are you sure?')) return
@@ -552,4 +516,3 @@ document.querySelector('#import').addEventListener('click', () => {
 	});
 });
 */
-document.querySelectorAll('.window').forEach(w => w.addEventListener('click', e => activeWindow(e.currentTarget)));

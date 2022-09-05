@@ -30,7 +30,7 @@ export function setupEventSource(requests, onUpdate) {
 		console.error(err);
 		if (es.readyState === 2) {
 			es.close()
-			setTimeout(() => setupEventSource(), 5000 * fails);
+			setTimeout(() => setupEventSource(requests, onUpdate), 5000 * fails);
 		}
 	});
 }
