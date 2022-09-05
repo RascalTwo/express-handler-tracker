@@ -95,5 +95,6 @@ module.exports = {
 
 		return replacements
 	},
-	description: 'Mongoose Models'
+	description: 'Mongoose Models',
+	experimental: true
 }

@@ -53,11 +53,11 @@ npx https://github.com/RascalTwo/expess-handler-tracker
 It has all the options that can be manually crafted:
 
 ```shell
-instrument.js [command]
+express-handler-tracker [command]
 
 Commands:
-  instrument.js instrument    Instrument code
-  instrument.js deinstrument  Remove instrumentation from code
+  express-handler-tracker instrument    Instrument code
+  express-handler-tracker deinstrument  Remove instrumentation from code
 
 Options:
   --help                    Show help                                  [boolean]
@@ -69,7 +69,12 @@ Options:
   --subRoute                Route to expose EHT server in existing Express
                             Application                                 [string]
   --yesToAll                Approve of all changes without prompt      [boolean]
-```
+  --package                 Automatically install/remove package from project
+                                                                       [boolean]
+  --replacers               Replacers to process the code:
+                            - server: Express Application
+                            - router: Express Routers
+                            - mongoose-model: Mongoose Models            [array]```
 
 It will attempt to detect a valid JavaScript file in the current working directory to use as an `entryPoint`, meaning that from your project directory you only need to execute
 

@@ -87,7 +87,7 @@ function collectFilepaths(modules) {
 		])
 }
 
-const getSelectedReplacers = () => argv.replacers?.length ? argv.replacers.map(name => replacers[name]) : Object.values(replacers)
+const getSelectedReplacers = () => argv.replacers?.length ? argv.replacers.map(name => replacers[name]) : Object.values(replacers).filter(replacer => !replacer.experimental)
 
 // Generate string replacements for instrumentation
 function collectInstrumentReplacements(content) {
