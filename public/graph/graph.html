@@ -110,17 +110,16 @@
 						<label for="animation-duration">Animation Duration (ms)</label>
 						<div class="form-group"><input type="range" id="animation-duration" min="0" max="2000" step="100"
 								value="1000"></div>
-						
-						<!--<label>Layout</label>
+						<label>Layout</label>
 						<div>
-							<button id="save">Save</button>
-							<button id="restore">Restore</button>
+							<button id="export-layout">Export</button>
+							<button id="import-layout">Import</button>
 						</div>
-						<label>Everything</label>
+						<label>Requests</label>
 						<div>
-							<button id="export">Export</button>
-							<button id="import">Import</button>
-						</div>-->
+							<button id="export-requests">Export</button>
+							<button id="import-requests">Import</button>
+						</div>
 						<div class="style-rules-wrapper">
 							<button id="add-rule">Add Style Rule</button>
 							<button id="reset-rules">Reset All Rules</button>
@@ -186,15 +185,33 @@
 			<button id="reset-all">Reset All</button>
 		</footer>
 
-		<input class="modal-state" id="modal-1" type="checkbox">
+		<input class="modal-state" id="modal-1" type="checkbox" autocomplete="off">
 		<div class="modal">
 			<label class="modal-bg" for="modal-1"></label>
 			<div class="modal-body">
 				<label class="btn-close" for="modal-1">X</label>
-				<h4 class="modal-title">Import Data</h4>
-				<input type="file" id="import-file" />
+				<h4 class="modal-title">Export Requests</h4>
+				<button id="invert-button">Invert</button>
+				<button id="all-button">All</button>
+				<ul class="form-group" style="max-height: 33vh; overflow: scroll; padding: 1rem;">
+				</ul>
+				<button id="download-requests">Download</button>
+				<button id="copy-requests">Copy</button>
+
+				<label for="modal-1">Close</label>
+			</div>
+		</div>
+
+		<input class="modal-state" id="modal-2" type="checkbox" autocomplete="off">
+		<div class="modal">
+			<label class="modal-bg" for="modal-2"></label>
+			<div class="modal-body">
+				<label class="btn-close" for="modal-2">X</label>
+				<h4 class="modal-title">Import Requests</h4>
+				<input id="import-file" type="file" />
 				<textarea id="import-text"></textarea>
-				<label for="modal-1">Import</label>
+
+				<label for="modal-2">Import</label>
 			</div>
 		</div>
 

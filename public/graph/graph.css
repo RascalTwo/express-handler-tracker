@@ -215,3 +215,19 @@ summary > button {
 	grid-column: 1 / 3;
 	display: block !important;
 }
+
+.modal {
+	z-index: 100;
+}
+
+input[type="checkbox"]:not(:checked) + span {
+	filter: brightness(62.5%);
+}
+
+.modal-body {
+	max-height: 85vh;
+}
+
+ul li::before {
+	content: none;
+}

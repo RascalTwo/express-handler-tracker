@@ -236,6 +236,9 @@ async function renderMiddleware() {
 	} else if (event.type === 'json') {
 		renderWindow(1, { body: '' })
 		renderWindow(2, { title: 'Response JSON', body: event.body });
+	} else if (event.type === 'proxy-evaluate') {
+		renderWindow(1, { body: '' })
+		renderWindow(2, { body: '' });
 	}
 
 	const urls = generateEventURLs(event)
@@ -340,13 +343,17 @@ async function renderMiddleware() {
 
 const requestSelect = document.querySelector('#requests');
 
+function generateRequestLabel(request) {
+	return request.start.request.method + ' ' + request.start.request.url
+}
+
 function renderRequestsSelect() {
 	const selected = requestSelect.value;
 	requestSelect.innerHTML = '';
 	requestSelect.appendChild(Object.entries(requests).reduce((frag, [value, request], i) => {
 		const option = document.createElement('option');
 		option.value = value;
-		option.textContent = request.start.request.method + ' ' + request.start.request.url
+		option.textContent = generateRequestLabel(request)
 		if (!i && !selected) option.selected = true;
 		else if (selected == option.value) option.selected = true;
 
@@ -516,3 +523,94 @@ document.querySelector('#import').addEventListener('click', () => {
 	});
 });
 */
+
+(() => {
+	const checkbox = document.querySelector('#modal-1');
+	const modal = checkbox.nextElementSibling;
+
+	document.querySelector('#all-button').addEventListener('click', () => {
+		const checkboxes = [...modal.querySelectorAll('input[type="checkbox"]')]
+		const newValue = !checkboxes.every(c => c.checked)
+		for (const checkbox of checkboxes) {
+			checkbox.checked = newValue;
+		}
+	});
+
+	document.querySelector('#invert-button').addEventListener('click', () => {
+		for (const checkbox of modal.querySelectorAll('input[type="checkbox"]')) {
+			checkbox.checked = !checkbox.checked;
+		}
+	});
+
+	function getSelectedRequests() {
+		return Object.fromEntries([...modal.querySelectorAll('input[type="checkbox"]:checked')].map(checkbox => {
+			const id = checkbox.id.split('-')[0];
+			return [id, requests[id]];
+		}))
+	}
+
+	document.querySelector('#copy-requests').addEventListener('click', () => {
+		navigator.clipboard.writeText(Flatted.stringify(getSelectedRequests())).then(() => alert('Requests copied to clipboard!'));
+	});
+
+
+	document.querySelector('#download-requests').addEventListener('click', () => {
+		const blob = new Blob([Flatted.stringify(getSelectedRequests())], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
+		const anchor = document.createElement('a');
+		anchor.style.display = 'none';
+		anchor.href = url;
+		anchor.download = 'requests.json';
+		document.body.appendChild(anchor);
+		anchor.click();
+		URL.revokeObjectURL(url);
+		anchor.remove();
+	});
+
+	document.querySelector('#export-requests').addEventListener('click', () => {
+		checkbox.checked = true;
+
+		modal.querySelector('ul').appendChild(Object.entries(requests).reduce((frag, [id, request]) => {
+			const li = document.createElement('li');
+			li.innerHTML = `
+				<label for="${id}-request" class="paper-check">
+					<input type="checkbox" name="paperChecks" id="${id}-request" value="option 2"> <span>${generateRequestLabel(request)}</span>
+				</label>
+			`;
+
+			frag.appendChild(li);
+			return frag;
+		}, document.createDocumentFragment()));
+	});
+})();
+
+
+(() => {
+	const checkbox = document.querySelector('#modal-2');
+	const modal = checkbox.nextElementSibling;
+
+
+	document.querySelector('#import-requests').addEventListener('click', () => {
+		checkbox.checked = true;
+		return new Promise(async (resolve, reject) => {
+			while (checkbox.checked) await new Promise(r => setTimeout(r, 1000));
+			const text = document.querySelector('#import-text').value
+			if (text) return resolve(text)
+			const file = document.querySelector('#import-file').files[0]
+			if (!file) return reject(new Error('No data given'));
+			const reader = new FileReader();
+			reader.onload = (e) => resolve(e.target.result);
+			reader.readAsText(file);
+		}).then(text => {
+			for (const key in requests){
+				delete requests[key];
+			}
+			Object.assign(requests, Flatted.parse(text))
+			renderInfo.request = Object.values(requests)[0]
+			renderInfo.middlewareIndex = 0;
+			renderRequestsSelect();
+			renderMiddlewaresSelect();
+			renderRequest();
+		});
+	});
+})();
