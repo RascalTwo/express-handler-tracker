@@ -27,10 +27,10 @@ server.get('/info', function sendDependencyInfo(_, response){
 	const viewsRelativeDirectory = path.relative(root, SETTINGS.views.directory)
 
 	if (!cruiseModules) {
-		const fullExt = '.' + SETTINGS.views.extension
+		const fullExt = SETTINGS.views.extension.startsWith('.') ? SETTINGS.views.extension : '.' + SETTINGS.views.extension;
 		const addExtIfMissing = name => name + (name.endsWith(fullExt) ? '' : fullExt)
 		const { output: { modules } } = cruise([SETTINGS.entryPoint], { exclude: ['node_modules', 'express-handler-tracker'] });
-		cruiseModules = modules.map(({ source, dependencies }) => ({ source, dependencies: dependencies.map(({ resolved }) => resolved) }))
+		cruiseModules = modules.filter(module => !module.coreModule).map(({ source, dependencies }) => ({ source, dependencies: dependencies.filter(dep => !dep.coreModule).map(({ resolved }) => resolved) }))
 		for (const module of [...cruiseModules]){
 			const viewNames = [...(fs.readFileSync(path.join(root, module.source)).toString().matchAll(/.*?\.render\(('|")(?<name>.*?)('|")(,|\))/gi) || [])]
 				.map(match => path.join(

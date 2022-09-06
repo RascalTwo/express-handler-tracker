@@ -10,15 +10,15 @@ export function sourceLineToID(objects, fullSrc) {
 }
 
 export function generateViewName(name) {
-	const fullExt = '.' + views.extension
+	const fullExt = views.extension.startsWith('.') ? views.extension : '.' + views.extension;
 	return name + (name.endsWith(fullExt) ? '' : fullExt)
 }
 
 export function generateEventURLs(event) {
 	return {
-		added: event.handler && `vscode://file${event.handler.adds[0][0]}`,
-		evaluated: event.evaluate?.lines && `vscode://file${event.evaluate.lines[0]}`,
-		construct: event.handler?.construct && `vscode://file${event.handler.construct[0]}`,
+		added: event.handler?.adds?.[0]?.length && `vscode://file${event.handler.adds[0][0]}`,
+		evaluated: event.evaluate?.lines.length && `vscode://file${event.evaluate.lines[0]}`,
+		construct: event.handler?.construct?.length && `vscode://file${event.handler.construct[0]}`,
 		source: event.handler?.location
 			? `vscode://file${event.handler.location.path}:${event.handler.location.line}:${event.handler.location.column}`
 			: event.source && `vscode://file${event.source}`,

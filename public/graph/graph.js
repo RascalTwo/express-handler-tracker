@@ -33,11 +33,15 @@ setupEventSource(requests, () => {
 function generateElements() {
 	const parents = {};
 	const elements = modules.map(mod => {
-		const parent = compoundNodes && mod.source.split('/').at(-2)
-		if (parent && !(parent in parents)) parents[parent] = { data: { id: parent, label: parent }, classes: 'group parent-' + parent }
+		const parentNames = compoundNodes ? mod.source.split('/').slice(0, -1).reverse() : []
+		for (let i = 0; i < parentNames.length; i++){
+			const current = parentNames[i];
+			const next = parentNames[i + 1];
+			if (!(current in parentNames)) parents[current] = { data: { id: current, label: current, parent: next }, classes: 'group parent-' + current }
+		}
 		return {
-			data: { id: mod.source, parent, label: mod.source.split('/').at(-1), href: `vscode://file${root}${mod.source}` },
-			classes: parent ? 'parent-' + parent : undefined
+			data: { id: mod.source, parent: parentNames[0], label: mod.source.split('/').at(-1), href: `vscode://file${root}${mod.source}` },
+			classes: parentNames[0] ? 'parent-' + parentNames[0] : undefined
 		}
 	})
 	for (const mod of modules) {
@@ -56,7 +60,7 @@ function generateElements() {
 	for (const req of Object.values(requests)) {
 		for (const event of req.events) {
 			if (event.type === 'view') {
-				const caller = sourceLineToID(elements, event.evaluate.lines[0])
+				const caller = event.evaluate.lines.length && sourceLineToID(elements, event.evaluate.lines[0])
 				const id = views.directory + '/' + generateViewName(event.name)
 				foundViews[event.name] = {
 					data: { id, label: generateViewName(event.name), parent: compoundNodes && views.directory },
@@ -256,6 +260,8 @@ async function renderMiddleware() {
 		document.querySelectorAll('details.highlighted-event').forEach(e => e.classList.remove('highlighted-event'));
 		currentInAll.classList.add('highlighted-event');
 	}
+
+	if (!remaining.length) remaining.push(renderInfo.lastNode.data('id'))
 
 	disableButtons()
 	while (remaining.length) {
@@ -471,7 +477,7 @@ document.querySelector('#reset-all').addEventListener('click', () => {
 	localStorage.clear()
 	alert('All local settings cleared')
 	window.location.reload()
-})
+});
 /*
 document.querySelector('#export').addEventListener('click', () => {
 	const data = Flatted.stringify({

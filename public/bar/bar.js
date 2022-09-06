@@ -92,9 +92,9 @@ function renderTooltip(event) {
 	else if (event.type === 'Frontend') label = '';
 	label += ' - ' + (event.end - event.start) + 'ms'
 	const urls = {
-		added: event.handler && `vscode://file${event.handler.adds[0][0]}`,
-		evaluated: event.evaluate?.lines && `vscode://file${event.evaluate?.lines[0]}`,
-		construct: event.handler?.construct && `vscode://file${event.handler.construct[0]}`,
+		added: event.handler?.adds[0]?.length && `vscode://file${event.handler.adds[0][0]}`,
+		evaluated: event.evaluate?.lines.length && `vscode://file${event.evaluate?.lines[0]}`,
+		construct: event.handler?.construct.length && `vscode://file${event.handler.construct[0]}`,
 		source: event.handler?.location ? `vscode://file${event.handler.location.path}:${event.handler.location.line}:${event.handler.location.column}` : event.source_line && `vscode://file${event.source_line}`
 	}
 	tooltipEl.innerHTML = `
