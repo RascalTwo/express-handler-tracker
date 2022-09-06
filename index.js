@@ -262,8 +262,8 @@ const returnHandler = (method, handler) => args => {
 }
 
 function wrapHandler(method, handler) {
-	if (handler.name === 'router' && !('__r2_construct_lines' in handler)) console.error('Un-instrumented router found:', getProjectLines()[0]);
 	if (typeof handler !== "function") throw new Error("Expected a callback function but got a " + Object.prototype.toString.call(handler));
+	if (handler.name === 'router' && !('__r2_construct_lines' in handler)) console.error('Un-instrumented router found:', getProjectLines()[0]);
 
 	const locPromise = FUNCTION_LOCATIONS.has(handler) ? Promise.resolve(FUNCTION_LOCATIONS.get(handler)) : funcLoc.locate(handler).then(loc => FUNCTION_LOCATIONS.set(handler, loc).get(handler))
 
