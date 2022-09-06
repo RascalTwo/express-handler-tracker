@@ -49,6 +49,9 @@ const getArgv = rawArgv => yargs(hideBin(rawArgv))
 	.option('package', { type: 'boolean', description: 'Automatically install/remove package from project' })
 	.option('replacers', { type: 'array', description: 'Replacers to process the code:\n' + Object.entries(replacers).map(([name, { description }]) => `- ${name}: ${description}`).join('\n') })
 	.check(argv => {
+		if (argv.replacers?.find(arg => arg.toLowerCase() === 'all')){
+			argv.replacers = Object.keys(replacers)
+		}
 		if (argv.replacers?.some(arg => !(arg in replacers))){
 			throw new Error(`Only [${Object.keys(replacers).join(', ')}] are allowed as replacers`)
 		}
