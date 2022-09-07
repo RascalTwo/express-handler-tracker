@@ -16,7 +16,9 @@ export function setupEventSource(requests, onUpdate) {
 				continue;
 			}
 			for (const event of request.events) {
-				requests[id].events.push(event)
+				const existsIndex = requests[id].events.findIndex(e => e.start === event.start);
+				if (existsIndex !== -1) requests[id].events.splice(existsIndex, 1, event);
+				else requests[id].events.push(event);
 			}
 
 			requests[id].events.sort((a, b) => a.start - b.start || a.order - b.order);

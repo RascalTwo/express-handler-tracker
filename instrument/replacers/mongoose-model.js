@@ -5,7 +5,8 @@ const MONGOOSE_MODEL_UNINSTRUMENTED_REGEX = /(?<symbol>=|:)\s?(?<value>(?<callin
 
 const MONGOOSE_MODEL_INSTRUMENTED_REGEX = /(?<symbol>=|:)\s?require\('@rascal_two\/express-handler-tracker'\)\.proxyInstrument\((?<value>(?<calling>.*?model)\(('|")(?<modelName>.*?)\4,\s?(?<arguments>[\s\S]*)\))[\s\S]*\)/gi
 
-const MONGOOSE_MODEL_PROPERTIES = ['where',
+const MONGOOSE_MODEL_PROPERTIES = ['constructor',
+	'where',
 	'aggregate',
 	'applyDefaults',
 	'bulkSave',

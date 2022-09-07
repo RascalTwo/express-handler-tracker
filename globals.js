@@ -14,7 +14,8 @@ const SETTINGS = {
 	views: {
 		directory: undefined,
 		extension: undefined
-	}
+	},
+	attachAsyncProxiesToLatestRequest: false
 }
 
 const REQUESTS = new Map();

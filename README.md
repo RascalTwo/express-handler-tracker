@@ -2,7 +2,7 @@
 
 > This project is ongoing Active development, I do not recommend reliance on it until this message is no longer here
 
-Tracks activities your Express application does - middlewares, responses, etc - allowing you to visualize all of these events and changes in a network graph, for both debugging and architectural understanding.
+Track the flow of requests through your application - then inspect them visually!
 
 ## Quickstart
 
@@ -97,7 +97,7 @@ const app = require('@rascal_two/express-handler-tracker')(express(), { entryPoi
 const router = require('@rascal_two/express-handler-tracker')(express.Router());
 ```
 
-This instrumentation method requires a single option:
+Instrumentation requires a single option:
 
 ```javascript
 {
@@ -110,10 +110,9 @@ There do exist optional properties that can be used for customization:
 ```javascript
 {
   port: 1234 // Port to start frontend server on, EHT server will not automatically start without,
-  diffExcludedProperties: ['array', 'of', 'regular', 'expression', 'strings', 'of', 'root', 'properties', 'to', 'ignore']
-  /*
-  which defaults to [ '^__r2', '^client$', '^_readableState$', '^next$', '^req$', '^res$', '^socket$', '^host$', '^sessionStore$']
-  */
+  diffExcludedProperties: ['array', 'of', 'regular', 'expression', 'strings', 'of', 'root', 'properties', 'to', 'ignore'],
+  /* defaults to [ '^__r2', '^client$', '^_readableState$', '^next$', '^req$', '^res$', '^socket$', '^host$', '^sessionStore$'] */
+  attachAsyncProxiesToLatestRequest: true // If proxy instrumented objects should attach to the latest request if their proper request could not be located
 }
 ```
 
@@ -163,6 +162,9 @@ module.exports = require('@rascal_two/express-handler-tracker').proxyInstrument(
 
 The `proxyInstrument` method takes the object to be instrumented, the label of the object, and all properties of the object to be instrumented - if an empty array is passed, then every property will be instrumented.
 
+> Due to the limitations of Node.js to access asynchronous call stacks, interactions with proxied objects from within promise callbacks may not be accurately reported
+> Enabling `attachAsyncProxiesToLatestRequest` will make these attach to the latest request, which will be accurate until the server receives multiple requests at once.
+
 ## Troubleshooting
 
 If you find requests take a long time, the most likely cause is that something large has been stringified during calculating the changes a event has made, the solution is to wait for it to complete and then locate the middleware that has taken the longest time.
@@ -171,13 +173,13 @@ Then select it and manually inspect it to see which base property contains the m
 
 Once located, adding this large property to your own `diffExcludedProperties` will resolve the issue.
 
-### Usage
+## Usage
 
 Visiting the EHT server will present you with a [Cytoscape](https://js.cytoscape.org/)-powered network graph representing your application code - staring from the provided `main: 'filename.js'` JavaScript file, with lines between nodes representing dependencies, and files in directories surrounded in those nodes.
 
 If following the MVC architectural pattern you'll see some coloring by default.
 
-#### API
+### API
 
 If the EHT frontend is not your desire, all the raw information is accessible via the `/requests` and `/info` endpoints
 
@@ -186,7 +188,7 @@ If the EHT frontend is not your desire, all the raw information is accessible vi
 - `/info`
   - Dependency and view information.
 
-#### Website
+### Website
 
 The first feature of the website is that - unless something unexpected happens - you never need to refresh the page to receive new events, they are streamed from the EHT server.
 
@@ -202,7 +204,7 @@ Each of these nodes can be clicked to open the file up in Visual Studio Code
 
 The bar at the bottom contains all the possible windows
 
-##### Layouts
+#### Layouts
 
 Settings for how the nodes are layed out on the page, from automatic placement algorithms, to use groups or bubble sets, displaying all or only current request edges, theming, and animation duration.
 
@@ -210,31 +212,35 @@ Additionally there are style rules, which determine the color and shape of all n
 
 The pattern can be inputted any valid Regular Expression for nodes to match - this will be ran on the filename - in addition to the color and shape to make matching nodes.
 
-##### Requests
+#### Requests
 
 The Request inspector allows one to see all the requests that have come in, the events associated for each, and the ability to navigate through all of them one by one - which updates the contents of other windows appropriately.
 
 Events that have been indented with hyphens are detected as sub-events, for example events that occurred within a unique Express Router.
 
+> Proxy Events seen with a trailing `*` were added via `attachAsyncProxiesToLatestRequest`, meaning there is a chance they don't belong to this request.
+
+&nbsp;
+
 > The Event toast that appears within the graph contains all known links for the event in question - from where it was added to the application, where it was evaluated, router construction, etc - all clickable to open the file to that location in Visual Studio Code
 
-##### Request Inspector
+#### Request Inspector
 
 Shows the changes to the request due to the currently selected event.
 
-##### Response Inspector
+#### Response Inspector
 
 Shows the changes to the request due to the currently selected event - additionally shows data passed to view rendering, sent data, and more output-related information.
 
-##### Current Code
+#### Current Code
 
 The current code for the selected middleware
 
-##### All Code
+#### All Code
 
 All of the code for the current request, with render buttons to render straight to that event in question.
 
-### How it works
+## How it works
 
 Overriding all request-handler receiving methods - `.use`, `.get`, `.post`, etc - middlewares are tracked.
 

@@ -17,7 +17,8 @@ module.exports = {
 		let options = {
 			entryPoint: argv.entryPoint,
 			port: argv.port,
-			diffExcludedProperties: argv.diffExcludedProperties
+			diffExcludedProperties: argv.diffExcludedProperties,
+			attachAsyncProxiesToLatestRequest: argv.attachAsyncProxiesToLatestRequest
 		}
 		for (const key in options) if (options[key] === undefined) delete options[key]
 		if (!Object.keys(options).length) options = undefined;

@@ -41,6 +41,7 @@ const getArgv = rawArgv => yargs(hideBin(rawArgv))
 		type: 'array',
 		description: 'Regexes of root properties to ignore when generating request & response differences',
 	})
+	.option('attachAsyncProxiesToLatestRequest', { type: 'boolean', description: 'Attach lost Proxy events to the latest request'})
 	.option('subRoute', {
 		type: 'string',
 		description: 'Route to expose EHT server in existing Express Application'

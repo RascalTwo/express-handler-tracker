@@ -1,5 +1,7 @@
 const fs = require('fs');
+const util = require('util');
 
+const { terminalCodesToHtml } = require("terminal-codes-to-html");
 const jestDiff = require('jest-diff');
 const deserialize = require('@ungap/structured-clone').deserialize;
 const serialize = require('./serialize');
@@ -92,12 +94,18 @@ function getEvaluateInfo() {
 function addRequestData(request, data) {
 	const info = REQUESTS.get(request.__r2_id);
 	if (!info) return;
+	addInfo(info, data);
+	info.end = { request: clone(request), response: clone(request.res) }
+}
+
+function addInfo(info, data){
 	data.order = info.events.length;
+	const replacingIndex = info.events.findIndex(e => e.start === data.start);
+	if (replacingIndex !== -1) info.events.splice(replacingIndex, 1);
 	info.events.push(data);
 	info.events.sort((a, b) => a.start - b.start || a.order - b.order);
-	info.end = { request: clone(request), response: clone(request.res) }
 	if (!SSE.clients.length) return;
-	SSE.backflow.push({ id: request.__r2_id, event: data });
+	SSE.backflow.push({ id: info.id, event: data });
 }
 
 
@@ -131,4 +139,8 @@ function clone(object) {
 	return cloneButIgnore(object, SETTINGS.diffExcludedProperties);
 }
 
-module.exports = { delay, getProjectLines, getLinesFromFilepathWithLocation, normalizeEvent, getHandlerInfo, getEvaluateInfo, addRequestData, generateDiffString, clone }
+function inspectToHTML(obj){
+	return terminalCodesToHtml(util.inspect(obj, { colors: true, numericSeparator: true, depth: null, maxArrayLength: null, maxStringLength: null, breakLength: 40 }))
+}
+
+module.exports = { delay, getProjectLines, getLinesFromFilepathWithLocation, normalizeEvent, getHandlerInfo, getEvaluateInfo, addRequestData, generateDiffString, clone, addInfo, inspectToHTML }

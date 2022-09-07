@@ -1,7 +1,7 @@
 import { LAYOUTS } from './constants.js'
 
 import { generateStylesheet } from './style-rules.js'
-import { sourceLineToID, generateViewName, generateEventURLs, generateEventCodeHTML, generateEventLabel } from './helpers.js'
+import { sourceLineToID, generateViewName, generateEventURLs, generateEventCodeHTML, generateEventLabel, generateProxyCallLabel } from './helpers.js'
 import { setupEventSource } from './sse.js';
 
 import { animationDuration } from './animation-duration.js';
@@ -241,8 +241,8 @@ async function renderMiddleware() {
 		renderWindow(1, { body: '' })
 		renderWindow(2, { title: 'Response JSON', body: event.body });
 	} else if (event.type === 'proxy-evaluate') {
-		renderWindow(1, { body: '' })
-		renderWindow(2, { body: '' });
+		renderWindow(1, event.args?.string ? { title: 'Arguments', body: generateProxyCallLabel(event, event.args.string.slice(1, -1)) } : { body: '' })
+		renderWindow(2, { title: 'Result', body: event.reason || event.value });
 	}
 
 	const urls = generateEventURLs(event)

@@ -3,7 +3,6 @@ const path = require('path');
 const inspector = require("inspector");
 
 const httpMethods = require("methods")
-const { terminalCodesToHtml } = require("terminal-codes-to-html");
 const funcLoc = require('func-loc');
 
 const { SETTINGS, REQUESTS, FUNCTION_LOCATIONS } = require('./globals')
@@ -11,7 +10,7 @@ const { MIDDLEWARE_WAIT_TIME } = require('./constants')
 
 const server = require('./server')
 const { startSSE } = require('./sse')
-const { getProjectLines, addRequestData, generateDiffString, getLinesFromFilepathWithLocation, getEvaluateInfo, clone, getHandlerInfo } = require('./helpers')
+const { getProjectLines, addRequestData, generateDiffString, getLinesFromFilepathWithLocation, getEvaluateInfo, clone, getHandlerInfo, addInfo, inspectToHTML } = require('./helpers')
 
 function errorToInfo(error) {
 	if (!error) return undefined;
@@ -38,10 +37,15 @@ const returnHandler = (method, handler) => args => {
 	const requestChanges = {
 		__r2_id(request, response) {
 			const id = request.headers['x-r2-id'] || performance.now();
-			REQUESTS.set(id, {
+
+			const info = {
+				id,
 				start: { request: clone(request), response: clone(response) },
 				events: [],
-			})
+			}
+			REQUESTS.set(id, info);
+			REQUESTS.set('latest', info);
+
 			response.on('finish', function addFinishEvent() {
 				const info = REQUESTS.get(id);
 				if (!info) return;
@@ -121,7 +125,7 @@ const returnHandler = (method, handler) => args => {
 					end: performance.now(),
 					type: 'send',
 					evaluate: getEvaluateInfo(),
-					body: typeof body === 'object' ? util.inspect(bodyCopy, { numericSeparator: true, depth: null, maxArrayLength: null, maxStringLength: null, breakLength: 40 }) : bodyCopy,
+					body: typeof body === 'object' ? inspectToHTML(bodyCopy) : bodyCopy,
 					contentType
 				});
 			}
@@ -137,7 +141,7 @@ const returnHandler = (method, handler) => args => {
 					end: performance.now(),
 					type: 'json',
 					evaluate: getEvaluateInfo(),
-					body: terminalCodesToHtml(util.inspect(body, { colors: true, numericSeparator: true, depth: null, maxArrayLength: null, maxStringLength: null, breakLength: 40 })),
+					body: inspectToHTML(body),
 				});
 			}
 			return original;
@@ -148,7 +152,7 @@ const returnHandler = (method, handler) => args => {
 	let start;
 
 	function before(error, request, response, next, paramValue) {
-		if (!request.__r2_proxies) request.__r2_proxies = [];
+		if (!request.__r2_proxies) request.__r2_proxies = new Map();
 
 		for (const key in requestChanges) {
 			if (!(key in request)) request[key] = requestChanges[key](request, response);
@@ -167,26 +171,16 @@ const returnHandler = (method, handler) => args => {
 	}
 
 	function after(error, request, response, next, paramValue, realEnd) {
-		if (request.__r2_proxies.length) {
-			const count = request.__r2_proxies.length;
-			const proxies = [...request.__r2_proxies];
-			request.__r2_proxies.splice(0, count);
-			for (const { info: { when, id, property }, url, location } of proxies) {
-				const line = url ? (url.split('file://')[1] + ':' + (location.lineNumber + 1) + ':' + (location.columnNumber + 1)) : undefined;
-				const { __r2_source: source, __r2_label: label } = proxied[id].obj
-				addRequestData(request, {
-					start: when,
-					end: performance.now(),
-					type: 'proxy-evaluate',
-					property,
-					evaluate: line ? {
-						lines: [line],
-						code: getLinesFromFilepathWithLocation(line)
-					} : undefined,
-					source,
-					label,
-					code: getLinesFromFilepathWithLocation(source)
-				});
+		if (request.__r2_proxies.size) {
+			const proxies = [...request.__r2_proxies.values()];
+			request.__r2_proxies.clear()
+			for (const { info, url, location } of proxies) {
+				const result = proxyPromiseResults.get(info.start)
+				if (result) {
+					proxyPromiseResults.delete(info.start);
+					Object.assign(info, result);
+				}
+				addRequestData(request, proxyInfoToEvent(info, url, location));
 			}
 		}
 
@@ -351,6 +345,7 @@ function wrapInstance(instance, options = {}) {
 		server.listen(options.port, () => console.log(`EHT available at http://localhost:${options.port}/`))
 	}
 	if (options.diffExcludedProperties) SETTINGS.diffExcludedProperties = options.diffExcludedProperties.map(s => new RegExp(s));
+	if (options.attachAsyncProxiesToLatestRequest) SETTINGS.attachAsyncProxiesToLatestRequest = options.attachAsyncProxiesToLatestRequest;
 
 
 	instance.__r2_construct_lines = getProjectLines();
@@ -366,6 +361,30 @@ function wrapInstance(instance, options = {}) {
 module.exports = wrapInstance;
 module.exports.server = server;
 
+function proxyInfoToEvent(info, url, location) {
+	const { start, id, property, argc, argv, value, reason, end } = info
+	const line = url ? (url.split('file://')[1] + ':' + (location.lineNumber + 1) + ':' + (location.columnNumber + 1)) : undefined;
+	const { __r2_source: source, __r2_label: label } = proxied[id].obj
+	return {
+		start,
+		end,
+		type: 'proxy-evaluate',
+		property,
+		evaluate: line ? {
+			lines: [line],
+			code: getLinesFromFilepathWithLocation(line)
+		} : undefined,
+		source,
+		label,
+		code: getLinesFromFilepathWithLocation(source),
+		args: {
+			string: argv,
+			count: argc
+		},
+		value,
+		reason
+	}
+}
 
 
 const session = new inspector.Session();
@@ -375,11 +394,11 @@ const send = util.promisify(session.post).bind(session);
 const expressionTemplate = `
 const event = EVENT;
 typeof request === 'object' && request.__r2_proxies
-	? request.__r2_proxies.push(event)
+	? request.__r2_proxies.set(event.start, event)
 	: typeof req === 'object' && req.__r2_proxies
-		? req.__r2_proxies.push(event)
+		? req.__r2_proxies.set(event.start, event)
 		: typeof r === 'object' && r.__r2_proxies
-			? r.__r2_proxies.push(event)
+			? r.__r2_proxies.set(event.start, event)
 			: false;
 `.trim();
 
@@ -401,43 +420,100 @@ session.on('Debugger.paused', ({ params: { callFrames } }) => {
 		possibles.push(frame);
 	}
 
-	const expression = expressionTemplate.replace(/EVENT/g, util.inspect({ info: stack.pop(), location: evaluated?.location, url: evaluated?.url }, { depth: null }));
-	(async () => {
-		for (let i = possibles.length - 1; i >= 0; i--) {
-			if (!paused) continue;
-			if ((await send('Debugger.evaluateOnCallFrame', {
-				callFrameId: possibles[i].callFrameId, expression
-			})).result.type === 'number') break
+	const info = stack.pop()
+	const expression = expressionTemplate.replace(/EVENT/g, util.inspect({ info, location: evaluated?.location, url: evaluated?.url }, { depth: null }));
+
+	const promises = [];
+	for (let i = possibles.length - 1; i >= 0; i--) promises.push(
+		send('Debugger.evaluateOnCallFrame', {
+			callFrameId: possibles[i].callFrameId, expression
+		})
+	)
+
+	Promise.allSettled(promises).then(results => {
+		if (SETTINGS.attachAsyncProxiesToLatestRequest && !results.find(r => r.value.result.type === 'number')) {
+			const requestInfo = REQUESTS.get('latest');
+			if (requestInfo.events.find(e => e.start === info.start)) return;
+			addInfo(requestInfo, Object.assign(proxyInfoToEvent(info, evaluated?.url, evaluated?.location), { attachedToLatestRequest: true }))
 		}
-	})();
+	});
 });
 
 const proxied = {};
+const proxyPromiseResults = new Map();
 
 module.exports.proxyInstrument = function (obj, label, properties = []) {
 	obj.__r2_source = getProjectLines()[0];
 	obj.__r2_id = performance.now();
 	obj.__r2_label = label;
 
-	Object.setPrototypeOf(obj.prototype, new Proxy(Object.getPrototypeOf(obj.prototype), {
+	const makeHandler = properties => ({
 		get(target, property, receiver) {
-			if (properties.length ? properties.includes(property) : true) {
-				stack.unshift({ when: performance.now(), property, id: obj.__r2_id });
-				send('Debugger.pause');
+			if (properties.length && !properties.includes(property)) {
+				return Reflect.get(target, property, receiver)
 			}
-			return Reflect.get(target, property, receiver);
-		}
-	}));
 
-	const proxy = new Proxy(obj, {
-		get(target, property, receiver) {
-			if (properties.length ? properties.includes(property) : true) {
-				stack.unshift({ when: performance.now(), property, id: obj.__r2_id });
+			const start = performance.now();
+			let value = Reflect.get(target, property, receiver);
+			if (typeof value === 'function') value = new Proxy(value, {
+				apply(target, thisArgument, argumentsList) {
+					const info = {
+						start,
+						property,
+						id: obj.__r2_id,
+						argv: inspectToHTML(argumentsList),
+						argc: argumentsList.length
+					}
+					const result = Reflect.apply(target, thisArgument, argumentsList);
+					if (typeof result !== 'object' || typeof result.then !== 'function') {
+						stack.unshift(Object.assign(info, { value: inspectToHTML(value), end: performance.now() }));
+						send('Debugger.pause');
+						return value;
+					}
+
+					stack.unshift(info);
+					send('Debugger.pause');
+					result.then = new Proxy(result.then, {
+						apply(target, thisArgument, [thenFunc, catchFunc]){
+							return Reflect.apply(target, thisArgument, [(...values) => {
+								proxyPromiseResults.set(start, { value: inspectToHTML(values), end: performance.now() })
+								return thenFunc(...values)
+							}, (...reasons) => {
+								proxyPromiseResults.set(start, { reason: inspectToHTML(reasons), end: performance.now() })
+								return catchFunc(...reasons);
+							}]);
+						}
+					})
+					return result;
+				}
+			})
+			else {
+				stack.unshift({ start, property, id: obj.__r2_id, value: inspectToHTML(value), end: performance.now() });
 				send('Debugger.pause');
 			}
-			return Reflect.get(target, property, receiver);
+			return value;
+		},
+		construct(target, args) {
+			if (!properties.includes('constructor')) return new target(...args);
+
+			const info = {
+				start: performance.now(),
+				property: 'constructor',
+				id: obj.__r2_id,
+				argv: inspectToHTML(args),
+				argc: args.length
+			}
+
+			const instance = new target(...args);
+
+			stack.unshift(Object.assign(info, { value: inspectToHTML(instance), end: performance.now() }));
+			send('Debugger.pause');
+
+			return instance;
 		}
 	})
+	Object.setPrototypeOf(obj.prototype, new Proxy(Object.getPrototypeOf(obj.prototype), makeHandler(properties.filter(prop => prop in obj.prototype))));
+	const proxy = new Proxy(obj, makeHandler(properties))
 	proxied[obj.__r2_id] = { obj, proxy };
 	return proxy;
 }
@@ -445,6 +521,6 @@ module.exports.proxyInstrument = function (obj, label, properties = []) {
 
 if (require.main === module) require('./instrument')
 else {
-	send('Runtime.enable').then(() => send('Debugger.enable', { maxScriptsCacheSize: 100000000 }));
+	send('Runtime.enable').then(() => send('Debugger.enable'));
 	startSSE();
 }

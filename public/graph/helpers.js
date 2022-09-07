@@ -48,6 +48,13 @@ export function generateEventCodeHTML(event) {
 	return allLines.map(({ key, html }) => `${key[0].toUpperCase() + key.slice(1)} <a href="${urls[key]}">${urls[key].replace('vscode://file' + root, '')}</a><br/><code>${html}</code>`).join('<br/>');
 }
 
+export function generateProxyCallLabel(event, content = '.'.repeat(event.args.count)) {
+	const suffix = event.attachedToLatestRequest ? '*' : '';
+	return event.property === 'constructor'
+		? `new ${event.label}(${content})${suffix}`
+		: `${event.label}.${event.property}(${content})${suffix}`;
+}
+
 export function generateEventLabel(event) {
 	let label = 'Unknown';
 	if (event.type === 'middleware') {
@@ -61,7 +68,7 @@ export function generateEventLabel(event) {
 	else if (event.type === 'view') label = views.directory + `/` + generateViewName(event.name)
 	else if (event.type === 'send') label = 'response.send()'
 	else if (event.type === 'json') label = 'response.json()'
-	else if (event.type === 'proxy-evaluate') label = `${event.label}.${event.property}(...)`;
+	else if (event.type === 'proxy-evaluate') label = generateProxyCallLabel(event);
 	label += ' - ' + (event.end - event.start).toFixed(2) + 'ms'
 	if (event.type === 'finish') label = `Finished in ${(event.end - renderInfo.request.events[0].start).toFixed(2)} ms`
 	return label

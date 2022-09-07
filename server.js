@@ -62,7 +62,7 @@ server.get('/reset', (request, response) => {
 
 server.get('/requests', function sendRequests(_, response){
 	response.set('Content-Type', 'application/json');
-	response.send(Flatted.stringify(Object.fromEntries(REQUESTS.entries())));
+	response.send(Flatted.stringify(Object.fromEntries([...REQUESTS.entries()].filter(([key]) => key !== 'latest'))));
 });
 
 module.exports = server
