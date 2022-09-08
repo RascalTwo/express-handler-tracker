@@ -25,6 +25,7 @@ document.querySelector('#allEdges').addEventListener('change', e => {
 
 setupEventSource(requests, () => {
 	if (!renderInfo.request) renderInfo.request = Object.values(requests)[0]
+	renderRequest()
 	renderRequestsSelect();
 	renderMiddlewaresSelect();
 })
@@ -370,6 +371,19 @@ function renderRequestsSelect() {
 }
 renderRequestsSelect()
 
+document.querySelector('#delete-request').addEventListener('click', () => {
+	if (!renderInfo.request) return;
+	const { request } = renderInfo
+	const index = Object.values(requests).findIndex(r => r.id === request.id)
+	delete requests[request.id]
+	renderInfo.request = Object.values(requests)[index] || Object.values(requests)[0];
+	renderRequestsSelect()
+	renderMiddlewaresSelect()
+	renderRequest()
+	renderMiddleware()
+	fetch('../delete-request?id=' + request.id)
+})
+
 
 function changeMiddleware(nth) {
 	let oldNth = renderInfo.middlewareIndex;
@@ -429,10 +443,14 @@ function renderRequestPath() {
 }
 function renderRequest() {
 	renderInfo.middlewareIndex = 0;
+	renderWindow(1, { body: '' })
+	renderWindow(2, { body: '' })
+	renderWindow(5, { body: '' })
+	renderWindow(6, { body: '' })
 	renderMiddleware();
 	renderBubbles()
-	if (!renderInfo.request) return
 	renderMiddlewaresSelect()
+	if (!renderInfo.request) return
 
 	const w6 = document.querySelector('#window6 pre')
 	w6.innerHTML = '';

@@ -64,5 +64,13 @@ server.get('/requests', function sendRequests(_, response){
 	response.set('Content-Type', 'application/json');
 	response.send(Flatted.stringify(Object.fromEntries([...REQUESTS.entries()].filter(([key]) => key !== 'latest'))));
 });
+server.get('/delete-request', function deleteRequest(request, response){
+	const id = +request.query.id;
+	if (!id) return response.status(404).end();
+	if (!REQUESTS.has(id)) return response.status(400).end();
+
+	REQUESTS.delete(id);
+	return response.status(200).end();
+})
 
 module.exports = server
