@@ -1,6 +1,6 @@
 import { LAYOUTS } from './constants.js'
 
-import { generateStylesheet, renderStyleRules } from './style-rules.js'
+import { generateStylesheet, renderStyleRules, updateStyles } from './style-rules.js'
 import { sourceLineToID, generateViewName, generateEventURLs, generateEventCodeHTML, generateEventLabel, generateProxyCallLabel } from './helpers.js'
 import { setupEventSource } from './sse.js';
 
@@ -14,12 +14,20 @@ let compoundNodes = document.querySelector('#groups').checked
 document.querySelector('#groups').addEventListener('change', e => {
 	compoundNodes = e.currentTarget.checked;
 	cy.json({ elements: generateElements() });
+	cy.style(generateStylesheet());
 	renderBubbles();
+	renderRequestPath()
 })
 
 let allEdges = document.querySelector('#allEdges').checked;
 document.querySelector('#allEdges').addEventListener('change', e => {
 	allEdges = e.currentTarget.checked;
+	renderRequestPath();
+})
+
+let allNodes = document.querySelector('#allNodes').checked;
+document.querySelector('#allNodes').addEventListener('change', e => {
+	allNodes = e.currentTarget.checked;
 	renderRequestPath();
 })
 
@@ -34,14 +42,14 @@ setupEventSource(requests, () => {
 function generateElements() {
 	const parents = {};
 	const elements = modules.map(mod => {
-		const parentNames = compoundNodes ? mod.source.split('/').slice(0, -1).reverse() : []
-		for (let i = 0; i < parentNames.length; i++){
+		const parentNames = mod.source.split('/').slice(0, -1).reverse()
+		for (let i = 0; i < parentNames.length; i++) {
 			const current = parentNames[i];
 			const next = parentNames[i + 1];
 			if (!(current in parentNames)) parents[current] = { data: { id: current, label: current, parent: next }, classes: 'group parent-' + current }
 		}
 		return {
-			data: { id: mod.source, parent: parentNames[0], label: mod.source.split('/').at(-1), href: `vscode://file${root}${mod.source}` },
+			data: { id: mod.source, parent: compoundNodes ? parentNames[0] : undefined, label: mod.source.split('/').at(-1), href: `vscode://file${root}${mod.source}` },
 			classes: parentNames[0] ? 'parent-' + parentNames[0] : undefined
 		}
 	})
@@ -77,7 +85,7 @@ function generateElements() {
 		elements.push(...Object.values(foundViews))
 		if (compoundNodes) elements.push({ data: { id: views.directory, label: views.directory }, classes: `parent-${views.directory} group` })
 	}
-	elements.push(...Object.values(parents))
+	if (compoundNodes) elements.push(...Object.values(parents))
 	return elements;
 }
 
@@ -108,8 +116,6 @@ function renderBubbles() {
 		includeSourceLabels: true,
 		includeTargetLabels: true, virtualEdges: true, interactive: true,
 	}
-	// TODO - color things based on new style rules here
-	//Object.entries(DIRECTORY_COLORS).forEach(([key, color]) => bb.addPath(cy.nodes(`.parent-${key}`), null, null, { ...options, style: { fill: color, fillOpacity: .25 } }))
 
 	if (!renderInfo.request) return;
 	const ids = new Set();
@@ -425,21 +431,40 @@ function attachRenderListeners(parent) {
 
 function renderRequestPath() {
 	cy.edges('.request-edge').removeClass('request-edge');
+	cy.nodes('.request-node').removeClass('request-node');
 
+	const nodeIDs = new Set();
 	for (const [i, event] of renderInfo.request.events.entries()) {
 		const nextEvent = renderInfo.request.events[i + 1]
-		if (!nextEvent) continue;
-		const from = generateEventNodes(event, renderInfo.forward).map(node => node.data('id'));
-		const to = generateEventNodes(nextEvent, renderInfo.forward).map(node => node.data('id'));
-		for (const f of from) {
-			const edgeIDs = new Set(to.map(id => `${f}-${id}`))
-			cy.filter(e => edgeIDs.has(e.data('id'))).addClass('request-edge')
+		if (nextEvent) [
+			...generateEventNodes(event, renderInfo.forward).map(node => node.data('id')),
+			...generateEventNodes(nextEvent, renderInfo.forward).map(node => node.data('id'))
+		].forEach(nodeIDs.add, nodeIDs);
+	}
+	const edgeIDs = new Set()
+	for (const from of nodeIDs) {
+		for (const to of nodeIDs) {
+			if (from === to) continue;
+			edgeIDs.add(`${from}-${to}`)
 		}
 	}
+	cy.filter(e => edgeIDs.has(e.data('id'))).addClass('request-edge');
+	cy.filter(n => nodeIDs.has(n.data('id'))).addClass('request-node');
 
-	if (allEdges) return cy.edges('.hidden').removeClass('hidden');
-	cy.edges('*').not('.request-edge').addClass('hidden')
-	cy.edges('.request-edge').removeClass('request-edge');
+
+	cy.edges('.hidden').removeClass('hidden');
+	if (!allNodes || !allEdges) {
+		cy.edges('*').not('.request-edge').addClass('hidden')
+		cy.edges('.request-edge').removeClass('request-edge');
+	}
+	cy.nodes('.hidden').removeClass('hidden');
+	if (!allNodes) {
+		for (const id of nodeIDs){
+			cy.$(`[id="${id}"]`).ancestors().addClass('request-node')
+		}
+		cy.nodes('*').not('.request-node').addClass('hidden')
+		cy.nodes('.request-node').removeClass('request-node');
+	}
 }
 function renderRequest() {
 	renderInfo.middlewareIndex = 0;
@@ -628,7 +653,7 @@ document.querySelector('#import').addEventListener('click', () => {
 			reader.onload = (e) => resolve(e.target.result);
 			reader.readAsText(file);
 		}).then(text => {
-			for (const key in requests){
+			for (const key in requests) {
 				delete requests[key];
 			}
 			Object.assign(requests, Flatted.parse(text))
@@ -646,10 +671,10 @@ document.querySelector('#import').addEventListener('click', () => {
 	const checkbox = document.querySelector('#modal-3');
 	const modal = checkbox.nextElementSibling;
 
-	function getSelectedData(){
+	function getSelectedData() {
 		const data = {}
 		if (modal.querySelector('#layout-windows-checkbox').checked) data.windows = Array.from({ length: 6 }, (_, i) => localStorage.getItem('window' + (i + 1) + '-style'))
-		if (modal.querySelector('#layout-nodes-checkbox').checked) data.nodes = cy.nodes().map(n => ({ id: n.id(), position: n.position()}))
+		if (modal.querySelector('#layout-nodes-checkbox').checked) data.nodes = cy.nodes().map(n => ({ id: n.id(), position: n.position() }))
 		if (modal.querySelector('#layout-style-rules').checked) data.styleRules = JSON.parse(localStorage.getItem('style-rules') || '{}');
 		return data
 	}
@@ -697,13 +722,13 @@ document.querySelector('#import').addEventListener('click', () => {
 		}).then(text => {
 			const { windows, nodes, styleRules } = Flatted.parse(text)
 			if (windows) {
-				for (let i = 0; i < windows.length; i++){
+				for (let i = 0; i < windows.length; i++) {
 					localStorage.setItem('window' + (i + 1) + '-style', windows[i])
 				}
 				renderInitialWindows();
 			}
 			if (nodes) {
-				for (const { id, position: { x, y } } of nodes){
+				for (const { id, position: { x, y } } of nodes) {
 					const node = cy.$('#' + id)
 					if (!node) continue;
 					node.position({ x, y });

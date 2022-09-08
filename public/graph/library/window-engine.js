@@ -151,10 +151,12 @@ function activeWindow(elmnt) {
         active[i].classList.remove("windowActive");
     }
     elmnt.classList.add("windowActive");
+    const wid = elmnt.id.split('window')[1]
     setTimeout(() => {
         document.querySelectorAll('[id^="button"]').forEach(b => b.classList.remove('btn-secondary'))
+        localStorage.setItem(`window${wid}-style`, elmnt.getAttribute('style'));
         if (elmnt.style.display === "none") return;
-        document.querySelector(`#button${elmnt.id.split('window')[1]}`).classList.add('btn-secondary')
+        document.querySelector(`#button${wid}`).classList.add('btn-secondary')
     }, 500)
 }
 

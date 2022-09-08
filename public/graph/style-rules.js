@@ -110,6 +110,7 @@ function parseStyleRules() {
 
 
 export function generateStylesheet(styleRules = parseStyleRules()) {
+	const dark = document.querySelector('html').classList.contains('dark')
 	if (window.cy?.styles) {
 		const oldStyles = window.cy.styles()
 		for (let i = 0; i < oldStyles.length; i++) {
@@ -134,7 +135,7 @@ export function generateStylesheet(styleRules = parseStyleRules()) {
 			style: {
 				label: 'data(label)',
 				'border-style': 'solid',
-				'border-width': '1px',
+				'border-width': '1',
 				'border-color': 'black',
 				"text-outline-color": "#fff",
 				"text-outline-width": 1,
@@ -169,10 +170,14 @@ export function generateStylesheet(styleRules = parseStyleRules()) {
 		}, {
 			selector: ".request-edge",
 			css: {
-				'overlay-color': 'black',
-				'overlay-opacity': 1,
-				'overlay-padding': '0.5',
-				'overlay-shape': 'round-rectangle',
+				'underlay-color': dark ? 'white' : 'black',
+				'underlay-padding': '3',
+			}
+		}, {
+			selector: ".request-node",
+			css: {
+				'border-color': dark ? 'white' : 'black',
+				'border-width': '2',
 			}
 		}, ...styleRules.map(({ class: className, color, shape }) => ({
 			"selector": '.' + className,
