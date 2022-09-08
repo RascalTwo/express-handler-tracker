@@ -48,7 +48,7 @@ const getArgv = rawArgv => yargs(hideBin(rawArgv))
 	})
 	.option('yesToAll', { type: 'boolean', description: 'Approve of all changes without prompt' })
 	.option('package', { type: 'boolean', description: 'Automatically install/remove package from project' })
-	.option('replacers', { type: 'array', description: 'Replacers to process the code:\n' + Object.entries(replacers).map(([name, { description }]) => `- ${name}: ${description}`).join('\n') })
+	.option('replacers', { type: 'array', description: 'Replacers to process the code:\n' + Object.entries(replacers).map(([name, { description }]) => `- ${name}: ${description}`).join('\n') + '\n- all: All replacers' })
 	.check(argv => {
 		if (argv.replacers?.find(arg => arg.toLowerCase() === 'all')){
 			argv.replacers = Object.keys(replacers)
@@ -60,6 +60,7 @@ const getArgv = rawArgv => yargs(hideBin(rawArgv))
 	})
 	.command('instrument', 'Instrument code')
 	.command('deinstrument', 'Remove instrumentation from code')
+	.command('version', 'Get current version')
 	.strictCommands()
 	.strictOptions()
 	.argv
@@ -156,7 +157,8 @@ async function deinstrument() {
 	if (argv.package) spawnPipedCommand('npm', 'uninstall', 'https://github.com/RascalTwo/express-handler-tracker');
 }
 
-if (argv._[0] === 'instrument') {
+if (argv._[0] === 'version') console.log(process.env.npm_package_version);
+else if (argv._[0] === 'instrument') {
 	// If no port && no subRoute, prevent
 	const noServer = !argv.port && !argv.subRoute
 	if (noServer) console.error('Neither port or subRoute provided, instrumentation will not result in a running server')
