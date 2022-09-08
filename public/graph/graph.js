@@ -459,7 +459,7 @@ function renderRequestPath() {
 	}
 	cy.nodes('.hidden').removeClass('hidden');
 	if (!allNodes) {
-		for (const id of nodeIDs){
+		for (const id of nodeIDs) {
 			cy.$(`[id="${id}"]`).ancestors().addClass('request-node')
 		}
 		cy.nodes('*').not('.request-node').addClass('hidden')
@@ -499,85 +499,22 @@ function disableButtons() {
 
 renderRequest()
 
-/*
-document.getElementById("save").addEventListener("click", function () {
-	window.localStorage.setItem("cy-elements", JSON.stringify(cy.json()));
-	alert('Graph Layout save to Local Storage')
-});
-*/
-
-/*
-document.getElementById("restore").addEventListener("click", function () {
-	cy.elements().remove();
-	cy.json({ elements: JSON.parse(window.localStorage.getItem("cy-elements")).elements }).layout({ name: 'preset' }).run();
-	renderRequestsSelect()
-	renderMiddleware()
-	renderBubbles();
-});
-*/
-
-
 document.querySelector('#reset-all').addEventListener('click', () => {
 	if (!confirm('Clearing all local settings, are you sure?')) return
 	localStorage.clear()
 	alert('All local settings cleared')
 	window.location.reload()
 });
-/*
-document.querySelector('#export').addEventListener('click', () => {
-	const data = Flatted.stringify({
-		requests,
-		modules,
-		root,
-		viewsDirectory,
-		windows: [
-			document.querySelector('#window1').getAttribute('style'),
-			document.querySelector('#window2').getAttribute('style'),
-			document.querySelector('#window3').getAttribute('style'),
-			document.querySelector('#window4').getAttribute('style'),
-			document.querySelector('#window5').getAttribute('style'),
-			document.querySelector('#window6').getAttribute('style'),
-		],
-		cyElements: cy.json()
-	})
-	navigator.clipboard.writeText(data).then(() => alert('All data saved to clipboard!'));
-});
-
-document.querySelector('#import').addEventListener('click', () => {
-	(navigator.clipboard.readText?.() || (async () => {
-		const checkbox = document.querySelector('#modal-1');
-		checkbox.checked = true;
-		return new Promise(async (resolve, reject) => {
-			while (checkbox.checked) await new Promise(r => setTimeout(r, 1000));
-			const text = document.querySelector('#import-requests-text').value
-			if (text) return resolve(text)
-			const file = document.querySelector('#import-requests-file').files[0]
-			if (!file) return reject(new Error('No data given'));
-			const reader = new FileReader();
-			reader.onload = (e) => resolve(e.target.result);
-			reader.readAsText(file);
-		});
-	})()).then(text => {
-		const data = Flatted.parse(text);
-		({ requests, modules, root, viewsDirectory } = data);
-		cy.elements().remove();
-		cy.json({ elements: data.cyElements.elements }).layout({ name: 'preset' }).run();
-		renderRequestsSelect()
-		renderMiddleware()
-		renderBubbles();
-		document.querySelector('#window1').setAttribute('style', data.windows[0]);
-		document.querySelector('#window2').setAttribute('style', data.windows[1]);
-		document.querySelector('#window3').setAttribute('style', data.windows[2]);
-		document.querySelector('#window4').setAttribute('style', data.windows[3]);
-		document.querySelector('#window5').setAttribute('style', data.windows[3]);
-		document.querySelector('#window6').setAttribute('style', data.windows[3]);
-	});
-});
-*/
 
 (() => {
 	const checkbox = document.querySelector('#modal-1');
 	const modal = checkbox.nextElementSibling;
+	modal.addEventListener('submit', e => {
+		e.preventDefault();
+		const name = modal.querySelector('#export-requests-input').value
+		localStorage.setItem(`saved-requests-${name}`, Flatted.stringify(getSelectedRequests()))
+		checkbox.checked = false;
+	})
 
 	document.querySelector('#all-button').addEventListener('click', () => {
 		const checkboxes = [...modal.querySelectorAll('input[type="checkbox"]')]
@@ -621,6 +558,19 @@ document.querySelector('#import').addEventListener('click', () => {
 	document.querySelector('#export-requests').addEventListener('click', () => {
 		checkbox.checked = true;
 
+		modal.reset()
+
+		const datalist = document.querySelector('#export-requests-datalist')
+		datalist.innerHTML = '';
+		datalist.appendChild(Object.keys(localStorage).reduce((frag, key) => {
+			if (!key.startsWith('saved-requests-')) return frag;
+			const name = key.split('saved-requests-')[1];
+			const option = document.createElement('option');
+			option.textContent = name;
+			frag.appendChild(option);
+			return frag;
+		}, document.createDocumentFragment()));
+
 		modal.querySelector('ul').appendChild(Object.entries(requests).reduce((frag, [id, request]) => {
 			const li = document.createElement('li');
 			li.innerHTML = `
@@ -639,12 +589,27 @@ document.querySelector('#import').addEventListener('click', () => {
 (() => {
 	const checkbox = document.querySelector('#modal-2');
 	const modal = checkbox.nextElementSibling;
+	modal.addEventListener('submit', e => e.preventDefault())
 
+	const select = document.querySelector('#import-requests-select')
+	select.innerHTML = '';
+	select.appendChild(Object.keys(localStorage).reduce((frag, key) => {
+		if (!key.startsWith('saved-requests-')) return frag;
+		const name = key.split('saved-requests-')[1];
+		const option = document.createElement('option');
+		option.textContent = name;
+		frag.appendChild(option);
+		return frag;
+	}, document.createDocumentFragment()));
 
 	document.querySelector('#import-requests').addEventListener('click', () => {
 		checkbox.checked = true;
+
+		modal.reset()
 		return new Promise(async (resolve, reject) => {
 			while (checkbox.checked) await new Promise(r => setTimeout(r, 1000));
+			const localName = document.querySelector('#import-requests-select').value
+			if (localName) return resolve(localStorage.getItem('saved-requests-' + localName))
 			const text = document.querySelector('#import-requests-text').value
 			if (text) return resolve(text)
 			const file = document.querySelector('#import-requests-file').files[0]
@@ -670,6 +635,12 @@ document.querySelector('#import').addEventListener('click', () => {
 (() => {
 	const checkbox = document.querySelector('#modal-3');
 	const modal = checkbox.nextElementSibling;
+	modal.addEventListener('submit', e => {
+		e.preventDefault();
+		const name = modal.querySelector('#export-layout-input').value
+		localStorage.setItem(`saved-layout-${name}`, Flatted.stringify(getSelectedData()))
+		checkbox.checked = false;
+	})
 
 	function getSelectedData() {
 		const data = {}
@@ -699,6 +670,18 @@ document.querySelector('#import').addEventListener('click', () => {
 
 	document.querySelector('#export-layout').addEventListener('click', () => {
 		checkbox.checked = true;
+		modal.reset()
+
+		const datalist = document.querySelector('#export-layout-datalist')
+		datalist.innerHTML = '';
+		datalist.appendChild(Object.keys(localStorage).reduce((frag, key) => {
+			if (!key.startsWith('saved-layout-')) return frag;
+			const name = key.split('saved-layout-')[1];
+			const option = document.createElement('option');
+			option.textContent = name;
+			frag.appendChild(option);
+			return frag;
+		}, document.createDocumentFragment()));
 	});
 })();
 
@@ -706,12 +689,27 @@ document.querySelector('#import').addEventListener('click', () => {
 (() => {
 	const checkbox = document.querySelector('#modal-4');
 	const modal = checkbox.nextElementSibling;
-
+	modal.addEventListener('submit', e => e.preventDefault())
 
 	document.querySelector('#import-layout').addEventListener('click', () => {
 		checkbox.checked = true;
+
+		const select = document.querySelector('#import-layout-select')
+		select.innerHTML = '';
+		select.appendChild(Object.keys(localStorage).reduce((frag, key) => {
+			if (!key.startsWith('saved-layout-')) return frag;
+			const name = key.split('saved-layout-')[1];
+			const option = document.createElement('option');
+			option.textContent = name;
+			frag.appendChild(option);
+			return frag;
+		}, document.createDocumentFragment()));
+
+		modal.reset()
 		return new Promise(async (resolve, reject) => {
 			while (checkbox.checked) await new Promise(r => setTimeout(r, 1000));
+			const localName = document.querySelector('#import-layout-select').value
+			if (localName) return resolve(localStorage.getItem('saved-layout-' + localName))
 			const text = document.querySelector('#import-layout-text').value
 			if (text) return resolve(text)
 			const file = document.querySelector('#import-layout-file').files[0]
@@ -729,7 +727,7 @@ document.querySelector('#import').addEventListener('click', () => {
 			}
 			if (nodes) {
 				for (const { id, position: { x, y } } of nodes) {
-					const node = cy.$('#' + id)
+					const node = cy.$(`[id="${id}"]`)
 					if (!node) continue;
 					node.position({ x, y });
 				}

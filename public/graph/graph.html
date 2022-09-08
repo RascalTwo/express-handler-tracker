@@ -197,37 +197,48 @@
 		</footer>
 
 		<input class="modal-state" id="modal-1" type="checkbox" autocomplete="off">
-		<div class="modal">
+		<form class="modal">
 			<label class="modal-bg" for="modal-1"></label>
 			<div class="modal-body">
 				<label class="btn-close" for="modal-1">X</label>
 				<h4 class="modal-title">Export Requests</h4>
-				<button id="invert-button">Invert</button>
-				<button id="all-button">All</button>
+				<button type="button" id="invert-button">Invert</button>
+				<button type="button" id="all-button">All</button>
 				<ul class="form-group" style="max-height: 33vh; overflow: scroll; padding: 1rem;">
 				</ul>
-				<button id="download-requests">Download</button>
-				<button id="copy-requests">Copy</button>
+				<button type="button" id="download-requests">Download</button>
+				<button type="button" id="copy-requests">Copy</button>
+				<div class="form-group" autocomplete="off">
+					<label for="export-requests-input">Local Storage</label>
+					<input placeholder="Nice input" id="export-requests-input" list="export-requests-datalist">
+					<datalist id="export-requests-datalist">
+					</datalist>
+					<button>Export</button>
+				</div>
 
 				<label for="modal-1">Close</label>
 			</div>
-		</div>
+		</form>
 
 		<input class="modal-state" id="modal-2" type="checkbox" autocomplete="off">
-		<div class="modal">
+		<form class="modal">
 			<label class="modal-bg" for="modal-2"></label>
 			<div class="modal-body">
 				<label class="btn-close" for="modal-2">X</label>
 				<h4 class="modal-title">Import Requests</h4>
 				<input id="import-requests-file" type="file" />
 				<textarea id="import-requests-text"></textarea>
+				<div autocomplete="off">
+					<label for="import-requests-select">Local Storage</label>
+					<div class="form-group"><select id="import-requests-select"></select></div>
+				</div>
 
 				<label for="modal-2">Import</label>
 			</div>
-		</div>
+		</form>
 
 		<input class="modal-state" id="modal-3" type="checkbox" autocomplete="off">
-		<div class="modal">
+		<form class="modal">
 			<label class="modal-bg" for="modal-3"></label>
 			<div class="modal-body">
 				<label class="btn-close" for="modal-3">X</label>
@@ -243,25 +254,36 @@
 						<input type="checkbox" name="paperChecks" id="layout-style-rules"> <span>Style Rules</span>
 					</label>
 				</div>
-				<button id="download-layout">Download</button>
-				<button id="copy-layout">Copy</button>
+				<button type="button" id="download-layout">Download</button>
+				<button type="button" id="copy-layout">Copy</button>
+				<div class="form-group" autocomplete="off">
+					<label for="export-layout-input">Local Storage</label>
+					<input placeholder="Nice input" id="export-layout-input" list="export-layout-datalist">
+					<datalist id="export-layout-datalist">
+					</datalist>
+					<button>Export</button>
+				</div>
 
 				<label for="modal-3">Close</label>
 			</div>
-		</div>
+		</form>
 
 		<input class="modal-state" id="modal-4" type="checkbox" autocomplete="off">
-		<div class="modal">
+		<form class="modal">
 			<label class="modal-bg" for="modal-4"></label>
 			<div class="modal-body">
 				<label class="btn-close" for="modal-4">X</label>
 				<h4 class="modal-title">Import Layout</h4>
 				<input id="import-layout-file" type="file" />
 				<textarea id="import-layout-text"></textarea>
+				<div autocomplete="off">
+					<label for="import-layout-select">Local Storage</label>
+					<div class="form-group"><select id="import-layout-select"></select></div>
+				</div>
 
 				<label for="modal-4">Import</label>
 			</div>
-		</div>
+		</form>
 
 		<span id="connection-indicator"></span>
 
