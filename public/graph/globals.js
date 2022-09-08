@@ -9,5 +9,6 @@ export const renderInfo = {
 	middlewareIndex: 0,
 	forward: true,
 	tip: undefined,
-	lastNode: undefined
+	lastNode: undefined,
+	animating: false,
 }

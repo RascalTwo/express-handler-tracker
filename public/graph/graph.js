@@ -358,18 +358,19 @@ async function renderMiddleware() {
 			const from = renderInfo.tip.props.getReferenceClientRect()
 			const to = ref.getBoundingClientRect()
 			if (JSON.stringify(from) !== JSON.stringify(to)) {
-				for (let i = 1; i <= 50; i++) {
+				const steps = animationDuration ? 50 : 1;
+				for (let i = 1; i <= steps; i++) {
 					setTimeout(() => {
 						renderInfo.tip.setProps({
 							getReferenceClientRect: () => {
 								const updated = {};
 								for (const key in from) {
-									updated[key] = percentileDiff(from[key], to[key], i / 50)
+									updated[key] = percentileDiff(from[key], to[key], i / steps)
 								}
 								return updated;
 							}
 						})
-					}, i * (animationDuration / 50))
+					}, i * (animationDuration / steps))
 				}
 			}
 
@@ -425,6 +426,7 @@ document.querySelector('#delete-request').addEventListener('click', () => {
 
 
 function changeMiddleware(nth) {
+	if (renderInfo.animating) return
 	let oldNth = renderInfo.middlewareIndex;
 	renderInfo.middlewareIndex = nth;
 	renderInfo.forward = renderInfo.middlewareIndex > oldNth;
@@ -528,10 +530,12 @@ requestSelect.addEventListener('change', (e) => {
 })
 
 function enableButtons() {
-	document.querySelectorAll('#events, #prev-middleware, #next-middleware').forEach(b => b.disabled = false)
+	renderInfo.animating = false;
+	document.querySelectorAll('input, textarea, button, select').forEach(b => b.disabled = false)
 }
 function disableButtons() {
-	document.querySelectorAll('#events, #prev-middleware, #next-middleware').forEach(b => b.disabled = true)
+	renderInfo.animating = true;
+	document.querySelectorAll('input, textarea, button, select').forEach(b => b.disabled = true)
 }
 
 renderRequest()
@@ -541,6 +545,16 @@ document.querySelector('#reset-all').addEventListener('click', () => {
 	localStorage.clear()
 	alert('All local settings cleared')
 	window.location.reload()
+});
+
+window.addEventListener('keyup', ({ target, key }) => {
+	if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
+	switch (key){
+		case 'ArrowLeft':
+		case 'ArrowRight':
+			changeMiddleware(Math.min(Math.max(renderInfo.middlewareIndex + (key === 'ArrowLeft' ? -1 : 1), 0), renderInfo.request.events.length - 1));
+			break
+	}
 });
 
 (() => {
