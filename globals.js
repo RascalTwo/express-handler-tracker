@@ -15,7 +15,11 @@ const SETTINGS = {
 		directory: undefined,
 		extension: undefined
 	},
-	attachAsyncProxiesToLatestRequest: false
+	attachAsyncProxiesToLatestRequest: false,
+	ignoreRequests: {
+		regexes: [],
+		callbacks: []
+	}
 }
 
 const REQUESTS = new Map();

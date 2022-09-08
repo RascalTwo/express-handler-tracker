@@ -149,9 +149,16 @@ const returnHandler = (method, handler) => args => {
 	}
 
 	let originals = {};
+	let ignored = false;
 	let start;
 
 	function before(error, request, response, next, paramValue) {
+		ignored = request.__r2_ignored || SETTINGS.ignoreRequests.regexes.some(regex => (request.method + ' ' + request.url).match(regex)) || SETTINGS.ignoreRequests.callbacks.some(cb => cb(request, response))
+		if (ignored) {
+			request.__r2_ignored = true;
+			return next(error);
+		}
+
 		if (!request.__r2_proxies) request.__r2_proxies = new Map();
 
 		for (const key in requestChanges) {
@@ -170,7 +177,9 @@ const returnHandler = (method, handler) => args => {
 		next(error);
 	}
 
-	function after(error, request, response, next, paramValue, realEnd) {
+	function after(error, request, response, next, paramValue) {
+		if (ignored) return next(error);
+
 		if (request.__r2_proxies.size) {
 			const proxies = [...request.__r2_proxies.values()];
 			request.__r2_proxies.clear()
@@ -222,7 +231,7 @@ const returnHandler = (method, handler) => args => {
 
 		addRequestData(request, {
 			start,
-			end: realEnd || performance.now(),
+			end: performance.now(),
 			error: errorToInfo(error),
 			type: 'middleware',
 			handler: getHandlerInfo(handler, REQUESTS.get(request.__r2_id).events.filter(event => typeof event.handler === 'object').map(event => event.handler)),
@@ -233,9 +242,9 @@ const returnHandler = (method, handler) => args => {
 
 
 	before(error, request, response, () => setTimeout(() => {
-		let nextAfter = (error, newNext = next, realEnd) => {
+		let nextAfter = (error, newNext = next) => {
 			nextAfter = undefined;
-			setTimeout(() => after(error, request, response, newNext, paramValue, realEnd), 1);
+			setTimeout(() => after(error, request, response, newNext, paramValue), 1);
 		}
 
 		const finishHandler = () => {
@@ -346,6 +355,10 @@ function wrapInstance(instance, options = {}) {
 	}
 	if (options.diffExcludedProperties) SETTINGS.diffExcludedProperties = options.diffExcludedProperties.map(s => new RegExp(s));
 	if (options.attachAsyncProxiesToLatestRequest) SETTINGS.attachAsyncProxiesToLatestRequest = options.attachAsyncProxiesToLatestRequest;
+	if (options.ignoreRequests) {
+		SETTINGS.ignoreRequests = options.ignoreRequests
+		if ('regexes' in SETTINGS.ignoreRequests) SETTINGS.ignoreRequests = SETTINGS.ignoreRequests.map(s => new RegExp(s));
+	}
 
 
 	instance.__r2_construct_lines = getProjectLines();

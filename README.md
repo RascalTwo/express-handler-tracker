@@ -7,7 +7,7 @@ Track the flow of requests through your application - then inspect them visually
 ## Quickstart
 
 ```shell
-$ npx https://github.com/RascalTwo/express-handler-tracker instrument --port=1338 --package
+$ npx https://github.com/RascalTwo/express-handler-tracker@latest instrument --port=1338 --package
 > ...
 > Changes made
 $ npm run start
@@ -18,7 +18,7 @@ $ npm run start
   <summary>Without NPX Usage</summary>
 
   ```shell
-  $ npm install https://github.com/RascalTwo/express-handler-tracker
+  $ npm install https://github.com/RascalTwo/express-handler-tracker@latest
   $ node node_modules/.bin/express-handler-tracker instrument --port=1338
   > ...
   > Changes made
@@ -28,12 +28,14 @@ $ npm run start
 
 </details>
 
+> To use the latest possibly unstable features, add the `--replacers=all --attachAsyncProxiesToLatestRequest` flags to the instrument command.
+
 ## Installation
 
 After installing the package:
 
 ```shell
-npm install https://github.com/RascalTwo/express-handler-tracker
+npm install https://github.com/RascalTwo/express-handler-tracker@latest
 ```
 
 Your Express application & any routers must be instrumented, actual application instrumentation only requires a single configurable: the entry point of your application.
@@ -47,7 +49,7 @@ This is the first file that dependency graphing should start from.
 There exists a automatic-instrumentation & deinstrumentation script that will attempt to automate this process for you, it can be ran directly:
 
 ```shell
-npx https://github.com/RascalTwo/express-handler-tracker
+npx https://github.com/RascalTwo/express-handler-tracker@latest
 ```
 
 It has all the options that can be manually crafted:
@@ -74,12 +76,14 @@ Options:
   --replacers               Replacers to process the code:
                             - server: Express Application
                             - router: Express Routers
-                            - mongoose-model: Mongoose Models            [array]```
+                            - mongoose-model: Mongoose Models
+                            - all: All replacers                         [array]
+```
 
 It will attempt to detect a valid JavaScript file in the current working directory to use as an `entryPoint`, meaning that from your project directory you only need to execute
 
 ```shell
-npx https://github.com/RascalTwo/express-handler-tracker instrument
+npx https://github.com/RascalTwo/express-handler-tracker@latest instrument
 ```
 
 and approve each of the changes to get started!
@@ -87,7 +91,7 @@ and approve each of the changes to get started!
 > To automatically reverse the process you can use the `deinstrument` subcommand:
 
 ```shell
-npx https://github.com/RascalTwo/express-handler-tracker deinstrument
+npx https://github.com/RascalTwo/express-handler-tracker@latest deinstrument
 ```
 
 ### Manual Instrumentation
@@ -112,7 +116,12 @@ There do exist optional properties that can be used for customization:
   port: 1234 // Port to start frontend server on, EHT server will not automatically start without,
   diffExcludedProperties: ['array', 'of', 'regular', 'expression', 'strings', 'of', 'root', 'properties', 'to', 'ignore'],
   /* defaults to [ '^__r2', '^client$', '^_readableState$', '^next$', '^req$', '^res$', '^socket$', '^host$', '^sessionStore$'] */
-  attachAsyncProxiesToLatestRequest: true // If proxy instrumented objects should attach to the latest request if their proper request could not be located
+  attachAsyncProxiesToLatestRequest: true, // If proxy instrumented objects should attach to the latest request if their proper request could not be located
+  ignoreRequests: {
+    regexes: ['array', 'of', 'regular', 'expressions', 'that', 'will', 'ignore', 'matching', 'requests']
+    // The string they will attempt to be matched against is the label of the request: method + ' ' + url,
+    callbacks: [(request, response) => request.get('X-Header-Name') === 'condition to ignore request']
+  }
 }
 ```
 
