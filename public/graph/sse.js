@@ -13,6 +13,8 @@ export function setupEventSource(requests, onUpdate) {
 		for (const [id, request] of Object.entries(newRequests)) {
 			if (!(id in requests)) {
 				requests[id] = request;
+				const events = request.events.reverse().filter((e, i) => request.events.findIndex(o => o.start === e.start) === i).reverse();
+				requests[id].events = events;
 				continue;
 			}
 			for (const event of request.events) {
