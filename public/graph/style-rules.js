@@ -5,7 +5,7 @@ if (!localStorage.getItem('style-rules')) localStorage.setItem('style-rules', JS
 
 
 
-function updateStyles() {
+export function updateStyles() {
 	const styleRules = parseStyleRules()
 	localStorage.setItem('style-rules', JSON.stringify(styleRules.reduce((obj, { class: className, ...rule }) => ({ ...obj, [className]: rule }), {})));
 	cy.style(generateStylesheet(styleRules));
@@ -69,7 +69,7 @@ function hookupStyleRuleListeners(row, pattern, color, shape) {
 	});
 }
 
-function renderStyleRules() {
+export function renderStyleRules() {
 	for (const [className, { pattern, color, shape }] of Object.entries(JSON.parse(localStorage.getItem('style-rules') || '{}'))) {
 		const isDefault = className === 'default-rule'
 		const row = document.querySelector(`tr[data-class="${className}"]`) || document.createElement('tr');

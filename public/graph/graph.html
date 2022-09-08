@@ -146,7 +146,8 @@
 				<br /><br />
 				<div class="mainWindow">
 					<div class="content-wrapper">
-						<label for="requests">Request</label><div><select id="requests"></select><button id="delete-request">Delete</button></div>
+						<label for="requests">Request</label>
+						<div><select id="requests"></select><button id="delete-request">Delete</button></div>
 
 						<label id="event-small"></label>
 						<select id="events" multiple>Events</select>
@@ -208,10 +209,47 @@
 			<div class="modal-body">
 				<label class="btn-close" for="modal-2">X</label>
 				<h4 class="modal-title">Import Requests</h4>
-				<input id="import-file" type="file" />
-				<textarea id="import-text"></textarea>
+				<input id="import-requests-file" type="file" />
+				<textarea id="import-requests-text"></textarea>
 
 				<label for="modal-2">Import</label>
+			</div>
+		</div>
+
+		<input class="modal-state" id="modal-3" type="checkbox" autocomplete="off">
+		<div class="modal">
+			<label class="modal-bg" for="modal-3"></label>
+			<div class="modal-body">
+				<label class="btn-close" for="modal-3">X</label>
+				<h4 class="modal-title">Export Layout</h4>
+				<div class="form-group">
+					<label for="layout-windows-checkbox" class="paper-check">
+						<input type="checkbox" name="paperChecks" id="layout-windows-checkbox"> <span>Windows</span>
+					</label>
+					<label for="layout-nodes-checkbox" class="paper-check">
+						<input type="checkbox" name="paperChecks" id="layout-nodes-checkbox"> <span>Node Positions</span>
+					</label>
+					<label for="layout-style-rules" class="paper-check">
+						<input type="checkbox" name="paperChecks" id="layout-style-rules"> <span>Style Rules</span>
+					</label>
+				</div>
+				<button id="download-layout">Download</button>
+				<button id="copy-layout">Copy</button>
+
+				<label for="modal-3">Close</label>
+			</div>
+		</div>
+
+		<input class="modal-state" id="modal-4" type="checkbox" autocomplete="off">
+		<div class="modal">
+			<label class="modal-bg" for="modal-4"></label>
+			<div class="modal-body">
+				<label class="btn-close" for="modal-4">X</label>
+				<h4 class="modal-title">Import Layout</h4>
+				<input id="import-layout-file" type="file" />
+				<textarea id="import-layout-text"></textarea>
+
+				<label for="modal-4">Import</label>
 			</div>
 		</div>
 

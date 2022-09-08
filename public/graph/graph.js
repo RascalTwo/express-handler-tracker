@@ -1,6 +1,6 @@
 import { LAYOUTS } from './constants.js'
 
-import { generateStylesheet } from './style-rules.js'
+import { generateStylesheet, renderStyleRules } from './style-rules.js'
 import { sourceLineToID, generateViewName, generateEventURLs, generateEventCodeHTML, generateEventLabel, generateProxyCallLabel } from './helpers.js'
 import { setupEventSource } from './sse.js';
 
@@ -524,9 +524,9 @@ document.querySelector('#import').addEventListener('click', () => {
 		checkbox.checked = true;
 		return new Promise(async (resolve, reject) => {
 			while (checkbox.checked) await new Promise(r => setTimeout(r, 1000));
-			const text = document.querySelector('#import-text').value
+			const text = document.querySelector('#import-requests-text').value
 			if (text) return resolve(text)
-			const file = document.querySelector('#import-file').files[0]
+			const file = document.querySelector('#import-requests-file').files[0]
 			if (!file) return reject(new Error('No data given'));
 			const reader = new FileReader();
 			reader.onload = (e) => resolve(e.target.result);
@@ -620,9 +620,9 @@ document.querySelector('#import').addEventListener('click', () => {
 		checkbox.checked = true;
 		return new Promise(async (resolve, reject) => {
 			while (checkbox.checked) await new Promise(r => setTimeout(r, 1000));
-			const text = document.querySelector('#import-text').value
+			const text = document.querySelector('#import-requests-text').value
 			if (text) return resolve(text)
-			const file = document.querySelector('#import-file').files[0]
+			const file = document.querySelector('#import-requests-file').files[0]
 			if (!file) return reject(new Error('No data given'));
 			const reader = new FileReader();
 			reader.onload = (e) => resolve(e.target.result);
@@ -640,3 +640,81 @@ document.querySelector('#import').addEventListener('click', () => {
 		});
 	});
 })();
+
+
+(() => {
+	const checkbox = document.querySelector('#modal-3');
+	const modal = checkbox.nextElementSibling;
+
+	function getSelectedData(){
+		const data = {}
+		if (modal.querySelector('#layout-windows-checkbox').checked) data.windows = Array.from({ length: 6 }, (_, i) => localStorage.getItem('window' + (i + 1) + '-style'))
+		if (modal.querySelector('#layout-nodes-checkbox').checked) data.nodes = cy.nodes().map(n => ({ id: n.id(), position: n.position()}))
+		if (modal.querySelector('#layout-style-rules').checked) data.styleRules = JSON.parse(localStorage.getItem('style-rules') || '{}');
+		return data
+	}
+
+	document.querySelector('#copy-layout').addEventListener('click', () => {
+		navigator.clipboard.writeText(Flatted.stringify(getSelectedData())).then(() => alert('Layout copied to clipboard!'));
+	});
+
+
+	document.querySelector('#download-layout').addEventListener('click', () => {
+		const blob = new Blob([Flatted.stringify(getSelectedData())], { type: 'application/json' });
+		const url = URL.createObjectURL(blob);
+		const anchor = document.createElement('a');
+		anchor.style.display = 'none';
+		anchor.href = url;
+		anchor.download = 'layout.json';
+		document.body.appendChild(anchor);
+		anchor.click();
+		URL.revokeObjectURL(url);
+		anchor.remove();
+	});
+
+	document.querySelector('#export-layout').addEventListener('click', () => {
+		checkbox.checked = true;
+	});
+})();
+
+
+(() => {
+	const checkbox = document.querySelector('#modal-4');
+	const modal = checkbox.nextElementSibling;
+
+
+	document.querySelector('#import-layout').addEventListener('click', () => {
+		checkbox.checked = true;
+		return new Promise(async (resolve, reject) => {
+			while (checkbox.checked) await new Promise(r => setTimeout(r, 1000));
+			const text = document.querySelector('#import-layout-text').value
+			if (text) return resolve(text)
+			const file = document.querySelector('#import-layout-file').files[0]
+			if (!file) return reject(new Error('No data given'));
+			const reader = new FileReader();
+			reader.onload = (e) => resolve(e.target.result);
+			reader.readAsText(file);
+		}).then(text => {
+			const { windows, nodes, styleRules } = Flatted.parse(text)
+			if (windows) {
+				for (let i = 0; i < windows.length; i++){
+					localStorage.setItem('window' + (i + 1) + '-style', windows[i])
+				}
+				renderInitialWindows();
+			}
+			if (nodes) {
+				for (const { id, position: { x, y } } of nodes){
+					const node = cy.$('#' + id)
+					if (!node) continue;
+					node.position({ x, y });
+				}
+			}
+			if (styleRules) {
+				localStorage.setItem('style-rules', JSON.stringify(styleRules))
+				renderStyleRules()
+				updateStyles()
+			}
+		});
+	});
+})();
+

@@ -17,7 +17,7 @@ function createWindow(id) {
     let headerID = windowID.firstElementChild;
     headerID.id = "window" + id + "header";
 
-    if (document.getElementById("window" + id).classList.contains('data')){
+    if (document.getElementById("window" + id).classList.contains('data')) {
         let createToggleButton = document.createElement("b");
         createToggleButton.id = "toggleButton" + id;
         createToggleButton.innerHTML = "🗘";
@@ -38,7 +38,7 @@ function createWindow(id) {
         this.classList.toggle('btn-success', opening);
         if (!opening) {
             this.classList.remove('btn-secondary');
-			fadeOut(windowID);
+            fadeOut(windowID);
         } else {
             fadeIn(windowID);
         }
@@ -72,7 +72,7 @@ function dragElement(elmnt) {
             try {
                 pos3touch = e.touches[0].clientX;
                 pos4touch = e.touches[0].clientY;
-            } catch(error) {}
+            } catch (error) { }
         }
         document.onmouseup = closeDragElement;
         document.onmousemove = elementDrag;
@@ -166,18 +166,21 @@ const observer = new MutationObserver(mutations => {
 })
 document.querySelectorAll('.window').forEach(w => observer.observe(w, { attributeFilter: ['class'] }))
 
-document.querySelector('#window1').setAttribute('style', window.localStorage.getItem("window1-style") || '');
-document.querySelector('#window2').setAttribute('style', window.localStorage.getItem("window2-style") || '');
-document.querySelector('#window3').setAttribute('style', window.localStorage.getItem("window3-style") || '');
-document.querySelector('#window4').setAttribute('style', window.localStorage.getItem("window4-style") || '');
-document.querySelector('#window5').setAttribute('style', window.localStorage.getItem("window5-style") || '');
-document.querySelector('#window6').setAttribute('style', window.localStorage.getItem("window6-style") || '');
-document.querySelector('#button1').className = +document.querySelector('#window1').style.opacity ? 'btn-success' : ''
-document.querySelector('#button2').className = +document.querySelector('#window2').style.opacity ? 'btn-success' : ''
-document.querySelector('#button3').className = +document.querySelector('#window3').style.opacity ? 'btn-success' : ''
-document.querySelector('#button4').className = +document.querySelector('#window4').style.opacity ? 'btn-success' : ''
-document.querySelector('#button5').className = +document.querySelector('#window5').style.opacity ? 'btn-success' : ''
-document.querySelector('#button6').className = +document.querySelector('#window6').style.opacity ? 'btn-success' : ''
+function renderInitialWindows() {
+    document.querySelector('#window1').setAttribute('style', window.localStorage.getItem("window1-style") || '');
+    document.querySelector('#window2').setAttribute('style', window.localStorage.getItem("window2-style") || '');
+    document.querySelector('#window3').setAttribute('style', window.localStorage.getItem("window3-style") || '');
+    document.querySelector('#window4').setAttribute('style', window.localStorage.getItem("window4-style") || '');
+    document.querySelector('#window5').setAttribute('style', window.localStorage.getItem("window5-style") || '');
+    document.querySelector('#window6').setAttribute('style', window.localStorage.getItem("window6-style") || '');
+    document.querySelector('#button1').className = +document.querySelector('#window1').style.opacity ? 'btn-success' : ''
+    document.querySelector('#button2').className = +document.querySelector('#window2').style.opacity ? 'btn-success' : ''
+    document.querySelector('#button3').className = +document.querySelector('#window3').style.opacity ? 'btn-success' : ''
+    document.querySelector('#button4').className = +document.querySelector('#window4').style.opacity ? 'btn-success' : ''
+    document.querySelector('#button5').className = +document.querySelector('#window5').style.opacity ? 'btn-success' : ''
+    document.querySelector('#button6').className = +document.querySelector('#window6').style.opacity ? 'btn-success' : ''
+}
+renderInitialWindows()
 
 document.querySelector('#button1').addEventListener('click', () => setTimeout(() => localStorage.setItem(`window1-style`, document.querySelector('#window' + 1).getAttribute('style')), 1000));
 document.querySelector('#button2').addEventListener('click', () => setTimeout(() => localStorage.setItem(`window2-style`, document.querySelector('#window' + 2).getAttribute('style')), 1000));
