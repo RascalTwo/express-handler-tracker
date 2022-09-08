@@ -294,6 +294,7 @@ async function renderMiddleware() {
 			getReferenceClientRect: ref.getBoundingClientRect, // https://atomiks.github.io/tippyjs/v6/all-props/#getreferenceclientrect
 			trigger: 'manual', // mandatory, we cause the tippy to show programmatically.
 			allowHTML: true,
+			appendTo: document.body,
 			interactive: true,
 			hideOnClick: false,
 			duration: [0, 0],
@@ -387,6 +388,7 @@ function renderMiddlewaresSelect() {
 	const eventsSelector = document.querySelector('#events')
 	const selected = eventsSelector.value;
 	eventsSelector.innerHTML = '';
+	if (!renderInfo.request) return;
 	const ends = []
 	eventsSelector.appendChild(renderInfo.request.events.reduce((frag, e, i) => {
 		const endingAfterMe = ends.filter(end => end > e.start).length

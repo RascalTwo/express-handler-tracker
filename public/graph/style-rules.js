@@ -160,7 +160,6 @@ export function generateStylesheet(styleRules = parseStyleRules()) {
 				'underlay-color': 'black',
 				'underlay-opacity': 1,
 				'underlay-padding': '2',
-				'underlay-shape': 'rectangle',
 			}
 		}, {
 			selector: '.hidden',
