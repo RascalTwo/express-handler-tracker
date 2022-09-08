@@ -174,11 +174,15 @@ footer > button {
 	padding: 0.1rem;
 }
 
-footer > button:last-child {
+footer > button:last-of-type {
 	float: right;
 }
 
-footer > button:nth-last-child(2) {
+footer > button:nth-last-of-type(2) {
+	float: right;
+}
+
+footer > span:last-of-type {
 	float: right;
 }
 

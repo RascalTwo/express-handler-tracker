@@ -263,6 +263,11 @@ async function renderMiddleware() {
 
 	document.querySelector('#event-small').textContent = `${renderInfo.middlewareIndex + 1}/${renderInfo.request.events.length}`
 	const event = renderInfo.request.events[renderInfo.middlewareIndex]
+	const duration = event.start - renderInfo.request.id
+	document.querySelector('meter').value = duration
+	document.querySelector('#meter-wrapper').childNodes[0].nodeValue = (+duration.toFixed(0)).toLocaleString() + 'ms'
+	document.querySelector('progress').value = renderInfo.middlewareIndex + 1
+	document.querySelector('#progress-wrapper').childNodes[0].nodeValue = renderInfo.middlewareIndex + 1
 
 	if (event.diffs) {
 		renderWindow(1, { title: 'Request', body: event.diffs.request.replace(/<R2_A>([\s\S]*?)<\/R2_A>/g, (_, string) => `<span class="red">${string}</span>`).replace(/<R2_B>([\s\S]*?)<\/R2_B>/g, (_, string) => `<span class="green">${string}</span>`) });
@@ -431,10 +436,11 @@ function changeMiddleware(nth) {
 	renderInfo.middlewareIndex = nth;
 	renderInfo.forward = renderInfo.middlewareIndex > oldNth;
 	renderMiddleware();
+
+	document.querySelector('#events').selectedOptions[0]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 }
 
 document.querySelector('#events').addEventListener('change', e => {
-	e.currentTarget.selectedOptions[0]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 	changeMiddleware(+e.currentTarget.value)
 })
 
@@ -456,6 +462,15 @@ function renderMiddlewaresSelect() {
 		return frag
 	}, document.createDocumentFragment()));
 	eventsSelector.size = eventsSelector.children.length
+
+	document.querySelector('#event-small').textContent = `${renderInfo.middlewareIndex + 1}/${renderInfo.request.events.length}`
+	const duration = renderInfo.request.events.at(-1).end - renderInfo.request.id;
+	document.querySelector('#meter-wrapper').childNodes[2].nodeValue = (+duration.toFixed(0)).toLocaleString() + 'ms'
+	document.querySelector('meter').value = 0;
+	document.querySelector('meter').max = duration;
+
+	document.querySelector('#progress-wrapper').childNodes[2].nodeValue = renderInfo.request.events.length
+	document.querySelector('progress').max = renderInfo.request.events.length;
 }
 
 function attachRenderListeners(parent) {
@@ -547,7 +562,7 @@ document.querySelector('#reset-all').addEventListener('click', () => {
 	window.location.reload()
 });
 
-window.addEventListener('keyup', ({ target, key }) => {
+window.addEventListener('keydown', ({ target, key }) => {
 	if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
 	switch (key){
 		case 'ArrowLeft':
