@@ -426,7 +426,7 @@ document.querySelector('#delete-request').addEventListener('click', () => {
 	renderMiddlewaresSelect()
 	renderRequest()
 	renderMiddleware()
-	fetch('../delete-request?id=' + request.id)
+	fetch('../delete-request?id=' + request.id).catch(console.error);
 })
 
 
@@ -717,6 +717,7 @@ window.addEventListener('keydown', ({ target, key }) => {
 		}
 		if (modal.querySelector('#layout-windows-checkbox').checked) data.windows = Array.from({ length: 6 }, (_, i) => localStorage.getItem('window' + (i + 1) + '-style'))
 		if (modal.querySelector('#layout-graph-checkbox').checked) data.graph = {
+			modules,
 			positions: cy.nodes().reduce((locs, n) => ({ ...locs, [n.id()]: n.position() }), {}),
 			zoom: cy.zoom(),
 			pan: cy.pan()
@@ -801,6 +802,9 @@ window.addEventListener('keydown', ({ target, key }) => {
 				renderInitialWindows();
 			}
 			if (graph) {
+				modules.splice(0, modules.length)
+				modules.push(...graph.modules)
+				cy.json({ elements: generateElements() })
 				for (const [id, { x, y }] of Object.entries(graph.positions).sort((a, b) => a[0].split('/').length - b[0].split('/').length)) {
 					cy.$(`[id="${id}"]`)?.position({ x, y })
 					locations.update(id, { x, y })
