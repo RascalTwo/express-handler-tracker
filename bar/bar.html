@@ -1,0 +1,54 @@
+<!DOCTYPE html>
+<html lang="en">
+
+	<head>
+		<meta charset="UTF-8">
+		<meta http-equiv="X-UA-Compatible" content="IE=edge">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Express Bar Graph</title>
+		<script src="../flatted.min.js"></script>
+		<script src="chart.js"></script>
+		<script src="hammer.js"></script>
+		<script src="chartjs-plugin-zoom.js"></script>
+		<style>
+			@media (prefers-color-scheme: dark) {
+				canvas {
+					filter: invert(1) hue-rotate(180deg);
+				}
+
+				body {
+					background-color: black;
+					color: white;
+				}
+			}
+
+			#chartjs-tooltip {
+				background: rgba(0, 0, 0, 0.7);
+				border-radius: 3px;
+				color: white;
+				opacity: 1;
+				position: absolute;
+				transform: translate(-50%, 0);
+				transition: all .1s ease;
+				pointer-events: none;
+			}
+
+			#chartjs-tooltip.clicked {
+				pointer-events: all;
+			}
+
+			#chartjs-tooltip.hidden:not(.clicked) {
+				opacity: 0;
+			}
+		</style>
+	</head>
+
+	<body>
+		<canvas id="myChart"></canvas>
+		<form action="/reset">
+			<button>Reset</button>
+		</form>
+		<script src="bar.js" type="module"></script>
+	</body>
+
+</html>
