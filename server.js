@@ -48,7 +48,8 @@ server.get('/info', function sendDependencyInfo(_, response){
 		views: {
 			directory: viewsRelativeDirectory,
 			extension: SETTINGS.views.extension
-		}
+		},
+		VERSION: process.env.npm_package_version
 	});
 });
 

@@ -8,7 +8,7 @@ import { animationDuration } from './animation-duration.js';
 
 import './theme.js';
 
-import { modules, root, views, requests, renderInfo } from './globals.js'
+import { modules, root, views, requests, renderInfo, VERSION } from './globals.js'
 
 let compoundNodes = document.querySelector('#groups').checked
 document.querySelector('#groups').addEventListener('change', e => {
@@ -98,9 +98,42 @@ window.cy = cytoscape({
 	wheelSensitivity: 0.05
 });
 window.cy.style(generateStylesheet())
-cy.on('tap', 'node', function () {
+for (const [id, { x, y }] of Object.entries(JSON.parse(localStorage.getItem('locations') || '{}')).sort((a, b) => a[0].split('/').length - b[0].split('/').length)) {
+	cy.$(`[id="${id}"]`).position({ x, y });
+}
+(() => {
+	const { zoom, pan } = JSON.parse(localStorage.getItem('info') || '{}');
+	if (zoom) cy.zoom(zoom);
+	if (pan) cy.pan(pan);
+})();
+
+cy.on('dbltap', 'node', function () {
 	const url = this.data('href')
 	if (url) window.location.href = url
+});
+const locations = (() => {
+	const locs = JSON.parse(localStorage.getItem('locations') || '{}');
+	return {
+		update(id, newLoc) {
+			locs[id] = newLoc
+			localStorage.setItem('locations', JSON.stringify(locs))
+		}
+	}
+})();
+cy.on('free', function ({ target }) {
+	locations.update(target.data('id'), target.position())
+});
+cy.on('pan', function () {
+	const info = JSON.parse(localStorage.getItem('info') || '{}')
+	info.pan = cy.pan()
+	localStorage.setItem('info', JSON.stringify(info))
+	if (!renderInfo.lastNode) return;
+	renderInfo.tip.setProps({ getReferenceClientRect: renderInfo.lastNode.popperRef().getBoundingClientRect })
+});
+cy.on('zoom', function () {
+	const info = JSON.parse(localStorage.getItem('info') || '{}')
+	info.zoom = cy.zoom()
+	localStorage.setItem('info', JSON.stringify(info))
 });
 
 const bb = cy.bubbleSets();
@@ -479,8 +512,12 @@ function renderRequest() {
 
 	const w6 = document.querySelector('#window6 pre')
 	w6.innerHTML = '';
+	let lastHTML = ''
 	for (const e of renderInfo.request.events) {
-		w6.innerHTML += `<details open data-event-id="${e.start + '' + e.order}"><summary>${generateEventLabel(e)} <button>Render</button></summary>${generateEventCodeHTML(e)}</details>`
+		let nextHTML = generateEventCodeHTML(e);
+		if (nextHTML === lastHTML || lastHTML.includes(nextHTML)) nextHTML = 'SAME'
+		if (nextHTML !== 'SAME') lastHTML = nextHTML
+		w6.innerHTML += `<details open data-event-id="${e.start + '' + e.order}"><summary>${generateEventLabel(e)} <button>Render</button></summary>${nextHTML === 'SAME' ? 'Same as previous' : nextHTML}</details>`
 	}
 	attachRenderListeners(w6)
 	renderRequestPath()
@@ -531,10 +568,13 @@ document.querySelector('#reset-all').addEventListener('click', () => {
 	});
 
 	function getSelectedRequests() {
-		return Object.fromEntries([...modal.querySelectorAll('input[type="checkbox"]:checked')].map(checkbox => {
-			const id = checkbox.id.split('-')[0];
-			return [id, requests[id]];
-		}))
+		return {
+			version: VERSION,
+			requests: Object.fromEntries([...modal.querySelectorAll('input[type="checkbox"]:checked')].map(checkbox => {
+				const id = checkbox.id.split('-')[0];
+				return [id, requests[id]];
+			}))
+		}
 	}
 
 	document.querySelector('#copy-requests').addEventListener('click', () => {
@@ -621,7 +661,7 @@ document.querySelector('#reset-all').addEventListener('click', () => {
 			for (const key in requests) {
 				delete requests[key];
 			}
-			Object.assign(requests, Flatted.parse(text))
+			Object.assign(requests, Flatted.parse(text).requests)
 			renderInfo.request = Object.values(requests)[0]
 			renderInfo.middlewareIndex = 0;
 			renderRequestsSelect();
@@ -643,9 +683,15 @@ document.querySelector('#reset-all').addEventListener('click', () => {
 	})
 
 	function getSelectedData() {
-		const data = {}
+		const data = {
+			version: VERSION
+		}
 		if (modal.querySelector('#layout-windows-checkbox').checked) data.windows = Array.from({ length: 6 }, (_, i) => localStorage.getItem('window' + (i + 1) + '-style'))
-		if (modal.querySelector('#layout-nodes-checkbox').checked) data.nodes = cy.nodes().map(n => ({ id: n.id(), position: n.position() }))
+		if (modal.querySelector('#layout-graph-checkbox').checked) data.graph = {
+			positions: cy.nodes().reduce((locs, n) => ({ ...locs, [n.id()]: n.position() }), {}),
+			zoom: cy.zoom(),
+			pan: cy.pan()
+		}
 		if (modal.querySelector('#layout-style-rules').checked) data.styleRules = JSON.parse(localStorage.getItem('style-rules') || '{}');
 		return data
 	}
@@ -718,19 +764,21 @@ document.querySelector('#reset-all').addEventListener('click', () => {
 			reader.onload = (e) => resolve(e.target.result);
 			reader.readAsText(file);
 		}).then(text => {
-			const { windows, nodes, styleRules } = Flatted.parse(text)
+			const { windows, graph, styleRules } = Flatted.parse(text)
 			if (windows) {
 				for (let i = 0; i < windows.length; i++) {
 					localStorage.setItem('window' + (i + 1) + '-style', windows[i])
 				}
 				renderInitialWindows();
 			}
-			if (nodes) {
-				for (const { id, position: { x, y } } of nodes) {
-					const node = cy.$(`[id="${id}"]`)
-					if (!node) continue;
-					node.position({ x, y });
+			if (graph) {
+				for (const [id, { x, y }] of Object.entries(graph.positions).sort((a, b) => a[0].split('/').length - b[0].split('/').length)) {
+					cy.$(`[id="${id}"]`)?.position({ x, y })
+					locations.update(id, { x, y })
 				}
+				cy.zoom(graph.zoom)
+				cy.pan(graph.pan)
+				localStorage.setItem('info', JSON.stringify({ zoom: graph.zoom, pan: graph.pan }));
 			}
 			if (styleRules) {
 				localStorage.setItem('style-rules', JSON.stringify(styleRules))
