@@ -484,18 +484,15 @@ function renderRequestPath() {
 	cy.nodes('.request-node').removeClass('request-node');
 
 	const nodeIDs = new Set();
+	const edgeIDs = new Set();
 	for (const [i, event] of renderInfo.request.events.entries()) {
 		const nextEvent = renderInfo.request.events[i + 1]
-		if (nextEvent) [
-			...generateEventNodes(event, renderInfo.forward).map(node => node.data('id')),
-			...generateEventNodes(nextEvent, renderInfo.forward).map(node => node.data('id'))
-		].forEach(nodeIDs.add, nodeIDs);
-	}
-	const edgeIDs = new Set()
-	for (const from of nodeIDs) {
-		for (const to of nodeIDs) {
-			if (from === to) continue;
-			edgeIDs.add(`${from}-${to}`)
+		for (const from of generateEventNodes(event, renderInfo.forward).map(node => node.data('id'))){
+			nodeIDs.add(from);
+			for (const to of generateEventNodes(nextEvent, renderInfo.forward).map(node => node.data('id'))){
+				edgeIDs.add(`${from}-${to}`);
+				nodeIDs.add(to);
+			}
 		}
 	}
 	cy.filter(e => edgeIDs.has(e.data('id'))).addClass('request-edge');
