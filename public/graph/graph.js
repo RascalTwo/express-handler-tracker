@@ -31,6 +31,12 @@ document.querySelector('#allNodes').addEventListener('change', e => {
 	renderRequestPath();
 })
 
+let eventNumbers = document.querySelector('#eventNumbers').checked
+document.querySelector('#eventNumbers').addEventListener('change', e => {
+	eventNumbers = e.currentTarget.checked;
+	renderRequestPath()
+})
+
 setupEventSource(requests, () => {
 	if (!renderInfo.request) renderInfo.request = Object.values(requests)[0]
 	renderRequest()
@@ -48,8 +54,9 @@ function generateElements() {
 			const next = parentNames[i + 1];
 			if (!(current in parentNames)) parents[current] = { data: { id: current, label: current, parent: next }, classes: 'group parent-' + current }
 		}
+		const label = mod.source.split('/').at(-1)
 		return {
-			data: { id: mod.source, parent: compoundNodes ? parentNames[0] : undefined, label: mod.source.split('/').at(-1), href: `vscode://file${root}${mod.source}` },
+			data: { id: mod.source, parent: compoundNodes ? parentNames[0] : undefined, label, baseLabel: label, href: `vscode://file${root}${mod.source}` },
 			classes: parentNames[0] ? 'parent-' + parentNames[0] : undefined
 		}
 	})
@@ -70,9 +77,10 @@ function generateElements() {
 		for (const event of req.events) {
 			if (event.type === 'view') {
 				const caller = event.evaluate.lines.length && sourceLineToID(elements, event.evaluate.lines[0])
-				const id = views.directory + '/' + generateViewName(event.name)
+				const label = generateViewName(event.name)
+				const id = views.directory + '/' + label
 				foundViews[event.name] = {
-					data: { id, label: generateViewName(event.name), parent: compoundNodes && views.directory },
+					data: { id, label, baseLabel: label, parent: compoundNodes && views.directory },
 					classes: 'parent-' + views.directory
 				}
 				if (caller) {
@@ -306,21 +314,20 @@ async function renderMiddleware() {
 		currentInAll.classList.add('highlighted-event');
 	}
 
-	if (!remaining.length) remaining.push(renderInfo.lastNode.data('id'))
+	const remainingNodes = generateEventNodes(event).reverse()
+	if (!renderInfo.forward) remainingNodes.reverse()
+
+	if (!remainingNodes.length) remainingNodes.push(renderInfo.lastNode)
 
 	disableButtons()
-	while (remaining.length) {
-		const url = remaining.pop()
-		const target = sourceLineToID(Object.values(cy.elements()).map(cye => {
-			if (typeof cye?.data === 'function') return { data: cye.data() }
-			else return { data: {} }
-		}), url)
+	while (remainingNodes.length) {
+		const target = remainingNodes.pop()
 
-		let node = cy.filter(e => e.data('id') === target?.data.id)[0];
+		let node = target
 		if (node) renderInfo.lastNode = node;
 		else node = renderInfo.lastNode;
 
-		if (!node) return;
+		if (!node) continue;
 
 		/*const nextReq = renderInfo.request.events[renderInfo.middlewareIndex + (renderInfo.forward ? 1 : -1)]
 		if (nextReq) {
@@ -341,6 +348,7 @@ async function renderMiddleware() {
 			allowHTML: true,
 			appendTo: document.body,
 			interactive: true,
+			placement: 'bottom',
 			hideOnClick: false,
 			duration: [0, 0],
 			zIndex: 50,
@@ -479,24 +487,84 @@ function attachRenderListeners(parent) {
 	))
 }
 
-function renderRequestPath() {
-	cy.edges('.request-edge').removeClass('request-edge');
-	cy.nodes('.request-node').removeClass('request-node');
+function extractRanges(numbers) {
+	if (!numbers.length) return '';
 
-	const nodeIDs = new Set();
-	const edgeIDs = new Set();
+	let ranges = [];
+	let start = numbers[0];
+
+	function addCurrentRange(last) {
+		const rangeLength = last - start;
+		if (rangeLength < 2) {
+			ranges.push(...Array.from({ length: rangeLength + 1 }, (_, i) => (i + start).toString()));
+		} else {
+			ranges.push(`${start}-${last}`);
+		}
+	}
+
+	for (let i = 1; i < numbers.length; i++) {
+		const current = numbers[i];
+		const last = numbers[i - 1];
+
+		if (current - last !== 1) {
+			addCurrentRange(last);
+			start = current;
+		}
+	}
+	addCurrentRange(numbers[numbers.length - 1]);
+
+	return ranges.join(',');
+}
+
+function renderRequestPath() {
+	cy.edges('.request-edge').removeClass('request-edge')
+	cy.nodes('.request-node').removeClass('request-node')
+
+	const nodeIDs = [];
+	const nodeIndexes = [];
+	const edgeIDs = [];
+	const edgeIndexes = [];
 	for (const [i, event] of renderInfo.request.events.entries()) {
 		const nextEvent = renderInfo.request.events[i + 1]
-		for (const from of generateEventNodes(event, renderInfo.forward).map(node => node.data('id'))){
-			nodeIDs.add(from);
-			for (const to of generateEventNodes(nextEvent, renderInfo.forward).map(node => node.data('id'))){
-				edgeIDs.add(`${from}-${to}`);
-				nodeIDs.add(to);
+		for (const from of generateEventNodes(event, true).map(node => node.data('id'))) {
+			nodeIDs.push(from);
+			nodeIndexes.push(i + 1);
+			for (const to of generateEventNodes(nextEvent, true).map(node => node.data('id'))) {
+				if (from === to) continue;
+				edgeIDs.push(`${from}-${to}`);
+				edgeIndexes.push(i + 2);
+				edgeIDs.push(`${to}-${from}`);
+				edgeIndexes.push(i + 2);
+				nodeIDs.push(to);
+				nodeIndexes.push(i + 2);
 			}
 		}
 	}
-	cy.filter(e => edgeIDs.has(e.data('id'))).addClass('request-edge');
-	cy.filter(n => nodeIDs.has(n.data('id'))).addClass('request-node');
+	cy.filter(e => edgeIDs.includes(e.data('id'))).addClass('request-edge').data('label', '').data('order', []);
+	cy.filter(n => nodeIDs.includes(n.data('id'))).addClass('request-node').data('order', []).forEach(n => n.data('label', n.data('baseLabel') || n.data('label')));
+
+	const indexing = {}
+	if (eventNumbers) {
+		for (const [i, edgeID] of [...edgeIDs].entries()) {
+			const edge = cy.$(`[id="${edgeID}"]`)
+			if (!edge.length) continue
+			edge.data('order', [...(edge.data('order') || []), edgeIndexes[i]]);
+			indexing[edgeID] = edge;
+		}
+		for (const [i, nodeID] of [...nodeIDs].entries()) {
+			const node = cy.$(`[id="${nodeID}"]`)
+			if (!node.length) continue
+
+			node.data('order', [...(node.data('order') || []), nodeIndexes[i]]);
+			indexing[nodeID] = node;
+		}
+		for (const entity of Object.values(indexing)) {
+			const oldLabel = entity.data('label');
+			const nums = extractRanges(entity.data('order').filter((o, i, arr) => arr.indexOf(o) === i))
+			if (oldLabel) entity.data('label', oldLabel + '\n' + nums)
+			else entity.data('label', nums)
+		}
+	}
 
 
 	cy.edges('.hidden').removeClass('hidden');

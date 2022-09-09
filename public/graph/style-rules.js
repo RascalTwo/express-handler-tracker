@@ -139,6 +139,7 @@ export function generateStylesheet(styleRules = parseStyleRules()) {
 				'border-color': 'black',
 				"text-outline-color": "#fff",
 				"text-outline-width": 1,
+				"text-wrap": "wrap",
 			}
 		}, {
 			"selector": ".group",
@@ -161,6 +162,16 @@ export function generateStylesheet(styleRules = parseStyleRules()) {
 				'underlay-color': 'black',
 				'underlay-opacity': 1,
 				'underlay-padding': '2',
+			}
+		}, {
+			selector: 'edge[label]',
+			css: {
+				label: 'data(label)',
+				"edge-text-rotation": "autorotate",
+				"text-wrap": "wrap",
+				"text-outline-color": "#fff",
+				"text-outline-width": 1,
+				'font-size': '10'
 			}
 		}, {
 			selector: '.hidden',
