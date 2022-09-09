@@ -419,17 +419,21 @@ function renderRequestsSelect() {
 }
 renderRequestsSelect()
 
-document.querySelector('#delete-request').addEventListener('click', () => {
-	if (!renderInfo.request) return;
-	const { request } = renderInfo
+function deleteRequest(id){
+	const request = requests[id];
 	const index = Object.values(requests).findIndex(r => r.id === request.id)
 	delete requests[request.id]
-	renderInfo.request = Object.values(requests)[index] || Object.values(requests)[0];
+	if (renderInfo.request.id === id) renderInfo.request = Object.values(requests)[index] || Object.values(requests)[index - 1] || Object.values(requests)[0];
+	if (requestSelect.value === id) requestSelect.value = renderInfo.request.id
 	renderRequestsSelect()
 	renderMiddlewaresSelect()
 	renderRequest()
 	renderMiddleware()
 	fetch('../delete-request?id=' + request.id).catch(console.error);
+}
+
+document.querySelector('#delete-request').addEventListener('click', () => {
+	if (renderInfo.request) deleteRequest(renderInfo.request.id);
 })
 
 
@@ -692,7 +696,6 @@ window.addEventListener('keydown', ({ target, key }) => {
 			return [id, requests[id]];
 		}))
 		if (Object.keys(selectedRequests).length) data.requests = selectedRequests;
-		console.log(data)
 		return data
 	}
 
@@ -715,12 +718,17 @@ window.addEventListener('keydown', ({ target, key }) => {
 		modal.querySelector('ul').innerHTML = '';
 		modal.querySelector('ul').appendChild(Object.entries(requests).reduce((frag, [id, request]) => {
 			const li = document.createElement('li');
-			console.log({ id, request })
 			li.innerHTML = `
-				<label for="${id}-request" class="paper-check">
-					<input type="checkbox" name="paperChecks" id="${id}-request" value="option 2"> <span>${generateRequestLabel(request)}</span>
+				<label for="${id}-request" class="paper-check" style="display: flex;">
+					<input type="checkbox" name="paperChecks" id="${id}-request" value="option 2">
+					<span style="flex: 1;">${generateRequestLabel(request)}</span>
+					<button style="float: right;" type="button">Delete</button>
 				</label>
 			`;
+			li.querySelector('button').addEventListener('click', () => {
+				deleteRequest(id)
+				li.remove()
+			})
 
 			frag.appendChild(li);
 			return frag;
