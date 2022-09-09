@@ -16,13 +16,13 @@ export function generateViewName(name) {
 
 export function generateEventURLs(event) {
 	return {
-		added: event.handler?.adds?.[0]?.length && `vscode://file${event.handler.adds[0][0]}`,
-		evaluated: event.evaluate?.lines.length && `vscode://file${event.evaluate.lines[0]}`,
-		construct: event.handler?.construct?.length && `vscode://file${event.handler.construct[0]}`,
+		added: event.handler?.add && `vscode://file${event.handler.add}`,
+		evaluated: event.evaluate?.line && `vscode://file${event.evaluate.line}`,
+		construct: event.handler?.construct && `vscode://file${event.handler.construct}`,
 		source: event.handler?.location
 			? `vscode://file${event.handler.location.path}:${event.handler.location.line}:${event.handler.location.column}`
 			: event.source && `vscode://file${event.source}`,
-		error: event.error?.lines.length ? `vscode://file${event.error?.lines[0]}` : undefined,
+		error: event.error?.line ? `vscode://file${event.error?.line}` : undefined,
 	}
 }
 
@@ -30,7 +30,7 @@ export function generateEventCodeHTML(event) {
 	const urls = generateEventURLs(event)
 
 	const codes = Object.fromEntries(Object.entries({
-		added: event.handler?.code?.adds,
+		added: event.handler?.code?.add,
 		evaluated: event.evaluate?.code,
 		construct: event.handler?.code?.construct,
 		source: event.handler?.code?.location || event.code,

@@ -31,7 +31,7 @@ const startSSEPiping = async () => {
 
 		const readyChunks = Object.values(chunksByRequests).flat();
 
-		for (const chunk of readyChunks) chunk.event = await normalizeEvent(chunk.event, REQUESTS.get(chunk.id)?.events.filter(event => event.order < chunk.event.order) || []);
+		for (const chunk of readyChunks) chunk.event = await normalizeEvent(chunk.event);
 
 		const newRequests = {};
 		for (const chunk of readyChunks) {

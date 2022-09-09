@@ -17,9 +17,7 @@ function delay(ms) {
 
 Error.stackTraceLimit = STACK_TRACE_LIMIT;
 
-function getProjectLines(error) {
-	const lines = []
-
+function getProjectLine(error) {
 	const container = {}
 	if (error) container.stack = error.stack
 	else {
@@ -31,9 +29,8 @@ function getProjectLines(error) {
 	for (const line of (container.stack || '').split('at ').slice(1)) {
 		const source = line.split('(').slice(1).join('(').split(')').slice(0, -1).join(')') || line
 		if (IGNORED_STACK_SOURCES.some(ignore => source.includes(ignore))) continue;
-		lines.push(source.trim())
+		return source.trim()
 	}
-	return lines[0] ? [lines[0]] : [];
 }
 
 
@@ -45,7 +42,7 @@ function getLinesFromFilepathWithLocation(path) {
 	return fs.readFileSync(filepath).toString().split('\n').slice(Math.max(0, start - 2), end);
 }
 
-async function normalizeEvent(event, previousEvents) {
+async function normalizeEvent(event) {
 	if (typeof event.handler === 'function' && !FUNCTION_LOCATIONS.has(event.handler)) {
 		FUNCTION_LOCATIONS.set(event.handler, null);
 		await funcLoc.locate(event.handler).then(loc => FUNCTION_LOCATIONS.set(event.handler, loc)).catch(() => undefined)
@@ -53,20 +50,20 @@ async function normalizeEvent(event, previousEvents) {
 
 
 	if (typeof event.handler === 'function') {
-		event.handler = getHandlerInfo(event.handler, previousEvents.filter(event => typeof event.handler === 'object').map(event => event.handler))
+		event.handler = getHandlerInfo(event.handler)
 	}
 	return event
 }
 
 
-function getHandlerInfo(handler, previousHandlers) {
+function getHandlerInfo(handler) {
 	const obj = {
 		name: handler.name,
-		adds: handler.__r2_add_lines,
-		construct: handler.__r2_construct_lines,
+		add: handler.__r2_add_line,
+		construct: handler.__r2_construct_line,
 		code: {
-			adds: handler.__r2_add_lines?.length ? getLinesFromFilepathWithLocation(handler.__r2_add_lines[0][0]) : undefined,
-			construct: handler.__r2_construct_lines ? getLinesFromFilepathWithLocation(handler.__r2_construct_lines[0]) : undefined,
+			add: handler.__r2_add_line ? getLinesFromFilepathWithLocation(handler.__r2_add_line) : undefined,
+			construct: handler.__r2_construct_line ? getLinesFromFilepathWithLocation(handler.__r2_construct_line) : undefined,
 		}
 	};
 	(FUNCTION_LOCATIONS.has(handler) || handler.__r2_location ? Promise.resolve(FUNCTION_LOCATIONS.get(handler) || handler.__r2_location) : funcLoc.locate(handler).then(loc => FUNCTION_LOCATIONS.set(handler, loc).get(handler))).then(loc => {
@@ -84,10 +81,10 @@ function getHandlerInfo(handler, previousHandlers) {
 
 
 function getEvaluateInfo() {
-	const lines = getProjectLines();
+	const line = getProjectLine();
 	return {
-		lines,
-		code: lines[0] && getLinesFromFilepathWithLocation(lines[0]) || undefined
+		line,
+		code: line && getLinesFromFilepathWithLocation(line) || undefined
 	}
 }
 
@@ -143,4 +140,4 @@ function inspectToHTML(obj){
 	return terminalCodesToHtml(util.inspect(obj, { colors: true, numericSeparator: true, depth: null, maxArrayLength: null, maxStringLength: null, breakLength: 40 }))
 }
 
-module.exports = { delay, getProjectLines, getLinesFromFilepathWithLocation, normalizeEvent, getHandlerInfo, getEvaluateInfo, addRequestData, generateDiffString, clone, addInfo, inspectToHTML }
+module.exports = { delay, getProjectLine, getLinesFromFilepathWithLocation, normalizeEvent, getHandlerInfo, getEvaluateInfo, addRequestData, generateDiffString, clone, addInfo, inspectToHTML }

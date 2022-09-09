@@ -10,15 +10,15 @@ const { MIDDLEWARE_WAIT_TIME } = require('./constants')
 
 const server = require('./server')
 const { startSSE } = require('./sse')
-const { getProjectLines, addRequestData, generateDiffString, getLinesFromFilepathWithLocation, getEvaluateInfo, clone, getHandlerInfo, addInfo, inspectToHTML } = require('./helpers')
+const { getProjectLine, addRequestData, generateDiffString, getLinesFromFilepathWithLocation, getEvaluateInfo, clone, getHandlerInfo, addInfo, inspectToHTML } = require('./helpers')
 
 function errorToInfo(error) {
 	if (!error) return undefined;
-	const lines = getProjectLines(error)
+	const line = getProjectLine(error)
 	return {
 		stack: error.stack,
-		lines,
-		code: lines.length ? getLinesFromFilepathWithLocation(lines[0]) : undefined
+		line,
+		code: line ? getLinesFromFilepathWithLocation(line) : undefined
 	}
 }
 
@@ -203,12 +203,12 @@ const returnHandler = (method, handler) => args => {
 					}
 				}
 				if (last?.handler?.name === handler.name) {
-					const accurateInfo = getHandlerInfo(handler, info.events.filter(event => typeof event.handler === 'object').map(event => event.handler))
-					if (accurateInfo.adds.length && accurateInfo.adds[0].length) {
-						last.handler.adds = accurateInfo.adds;
-						if (accurateInfo.code?.adds) {
+					const accurateInfo = getHandlerInfo(handler)
+					if (accurateInfo.add) {
+						last.handler.add = accurateInfo.add;
+						if (accurateInfo.code?.add) {
 							if (!last.handler.code) last.handler.code = {}
-							last.handler.code.adds = accurateInfo.code.adds;
+							last.handler.code.add = accurateInfo.code.add;
 						}
 					}
 					return next(error);
@@ -234,7 +234,7 @@ const returnHandler = (method, handler) => args => {
 			end: performance.now(),
 			error: errorToInfo(error),
 			type: 'middleware',
-			handler: getHandlerInfo(handler, REQUESTS.get(request.__r2_id).events.filter(event => typeof event.handler === 'object').map(event => event.handler)),
+			handler: getHandlerInfo(handler,),
 			diffs
 		});
 		next(error);
@@ -266,11 +266,11 @@ const returnHandler = (method, handler) => args => {
 
 function wrapHandler(method, handler) {
 	if (typeof handler !== "function") throw new Error("Expected a callback function but got a " + Object.prototype.toString.call(handler));
-	if (handler.name === 'router' && !('__r2_construct_lines' in handler)) console.error('Un-instrumented router found:', getProjectLines()[0]);
+	if (handler.name === 'router' && !('__r2_construct_line' in handler)) console.error('Un-instrumented router found:', getProjectLine());
 
 	const locPromise = FUNCTION_LOCATIONS.has(handler) ? Promise.resolve(FUNCTION_LOCATIONS.get(handler)) : funcLoc.locate(handler).then(loc => FUNCTION_LOCATIONS.set(handler, loc).get(handler))
 
-	if (!('__r2_add_lines' in handler)) handler.__r2_add_lines = [...(handler.__r2_add_lines || []), getProjectLines()];
+	if (!('__r2_add_line' in handler)) handler.__r2_add_line = getProjectLine();
 	else {
 		const oldHandler = handler;
 		const evalWrapper = handler.length === 4 ? {
@@ -299,10 +299,10 @@ function wrapHandler(method, handler) {
 		}
 	}
 
-	handler.__r2_add_lines = [...(handler.__r2_add_lines || []), getProjectLines()];
+	handler.__r2_add_line = getProjectLine()
 	locPromise.then(loc => handler.__r2_location = loc)
 	wrapperObj[handler.name].__r2_wrapper = true;
-	wrapperObj[handler.name].__r2_add_lines = [...(wrapperObj[handler.name].__r2_add_lines || []), getProjectLines()];
+	wrapperObj[handler.name].__r2_add_line = getProjectLine();
 
 	if (handler.name === "router") Object.assign(wrapperObj[handler.name], handler);
 
@@ -361,7 +361,7 @@ function wrapInstance(instance, options = {}) {
 	}
 
 
-	instance.__r2_construct_lines = getProjectLines();
+	instance.__r2_construct_line = getProjectLine();
 
 	const wrappedInstance = wrapMethods(instance);
 
@@ -384,7 +384,7 @@ function proxyInfoToEvent(info, url, location) {
 		type: 'proxy-evaluate',
 		property,
 		evaluate: line ? {
-			lines: [line],
+			line,
 			code: getLinesFromFilepathWithLocation(line)
 		} : undefined,
 		source,
@@ -456,7 +456,7 @@ const proxied = {};
 const proxyPromiseResults = new Map();
 
 module.exports.proxyInstrument = function (obj, label, properties = []) {
-	obj.__r2_source = getProjectLines()[0];
+	obj.__r2_source = getProjectLine();
 	obj.__r2_id = performance.now();
 	obj.__r2_label = label;
 

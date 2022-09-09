@@ -76,7 +76,7 @@ function generateElements() {
 	for (const req of Object.values(requests)) {
 		for (const event of req.events) {
 			if (event.type === 'view') {
-				const caller = event.evaluate.lines.length && sourceLineToID(elements, event.evaluate.lines[0])
+				const caller = event.evaluate.line && sourceLineToID(elements, event.evaluate.line)
 				const label = generateViewName(event.name)
 				const id = views.directory + '/' + label
 				foundViews[event.name] = {
@@ -265,6 +265,15 @@ function generateEventNodes(event, forward) {
 	return nodes;
 }
 
+function generateEventTooltipContent(event, urls){
+	let content = document.createElement('div');
+
+	content.innerHTML = generateEventLabel(event);
+	content.innerHTML += '<br/>' + Object.entries(urls).filter(([_, url]) => url && !url.includes('node_modules') && !url.includes('express-handler-tracker')).reduce((lines, [name, url]) => [...lines, `<a href="${url}">${name[0].toUpperCase() + name.slice(1)}</a>`], []).join('<br/>')
+
+	return content;
+}
+
 async function renderMiddleware() {
 	if (!renderInfo.request) return
 	document.querySelector('#events').value = renderInfo.middlewareIndex;
@@ -278,9 +287,9 @@ async function renderMiddleware() {
 	document.querySelector('#progress-wrapper').childNodes[0].nodeValue = renderInfo.middlewareIndex + 1
 
 	if (event.diffs) {
-		renderWindow(1, { title: 'Request', body: event.diffs.request.replace(/<R2_A>([\s\S]*?)<\/R2_A>/g, (_, string) => `<span class="red">${string}</span>`).replace(/<R2_B>([\s\S]*?)<\/R2_B>/g, (_, string) => `<span class="green">${string}</span>`) });
+		renderWindow(1, { title: 'Request', body: event.diffs.request?.replace(/<R2_A>([\s\S]*?)<\/R2_A>/g, (_, string) => `<span class="red">${string}</span>`).replace(/<R2_B>([\s\S]*?)<\/R2_B>/g, (_, string) => `<span class="green">${string}</span>`) || '' });
 
-		renderWindow(2, { title: 'Response', body: event.diffs.response.replace(/<R2_A>([\s\S]*?)<\/R2_A>/g, (_, string) => `<span class="red">${string}</span>`).replace(/<R2_B>([\s\S]*?)<\/R2_B>/g, (_, string) => `<span class="green">${string}</span>`) });
+		renderWindow(2, { title: 'Response', body: event.diffs.response?.replace(/<R2_A>([\s\S]*?)<\/R2_A>/g, (_, string) => `<span class="red">${string}</span>`).replace(/<R2_B>([\s\S]*?)<\/R2_B>/g, (_, string) => `<span class="green">${string}</span>`) || '' });
 	} else if (event.type === 'redirect') {
 		renderWindow(1, { body: '' })
 		renderWindow(2, { title: 'Redirected', body: event.path })
@@ -355,14 +364,7 @@ async function renderMiddleware() {
 
 			// your own custom props
 			// content prop can be used when the target is a single element https://atomiks.github.io/tippyjs/v6/constructor/#prop
-			content: () => {
-				let content = document.createElement('div');
-
-				content.innerHTML = generateEventLabel(event);
-				content.innerHTML += '<br/>' + Object.entries(urls).filter(([_, url]) => url && !url.includes('node_modules') && !url.includes('express-handler-tracker')).reduce((lines, [name, url]) => [...lines, `<a href="${url}">${name[0].toUpperCase() + name.slice(1)}</a>`], []).join('<br/>')
-
-				return content;
-			}
+			content: generateEventTooltipContent.bind(null, event, urls)
 		})
 		else {
 			function percentileDiff(a, b, percent) {
@@ -387,14 +389,7 @@ async function renderMiddleware() {
 				}
 			}
 
-			renderInfo.tip.setContent(() => {
-				let content = document.createElement('div');
-
-				content.innerHTML = generateEventLabel(event);
-				content.innerHTML += '<br/>' + Object.entries(urls).filter(([_, url]) => url && !url.includes('node_modules') && !url.includes('express-handler-tracker')).reduce((lines, [name, url]) => [...lines, `<a href="${url}">${name[0].toUpperCase() + name.slice(1)}</a>`], []).join('<br/>')
-
-				return content;
-			})
+			renderInfo.tip.setContent(generateEventTooltipContent(event, urls))
 			if (JSON.stringify(from) !== JSON.stringify(to)) await new Promise(r => setTimeout(r, animationDuration));
 		}
 		renderInfo.tip.show();
