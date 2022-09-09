@@ -6,7 +6,7 @@ const cors = require('cors');
 const Flatted = require('flatted')
 const { cruise } = require("dependency-cruiser");
 
-const { SETTINGS, REQUESTS } = require('./globals')
+const { SETTINGS, REQUESTS, VERSION } = require('./globals')
 
 const { handleSSERequests } = require('./sse')
 
@@ -49,7 +49,7 @@ server.get('/info', function sendDependencyInfo(_, response){
 			directory: viewsRelativeDirectory,
 			extension: SETTINGS.views.extension
 		},
-		VERSION: process.env.npm_package_version
+		VERSION: VERSION
 	});
 });
 

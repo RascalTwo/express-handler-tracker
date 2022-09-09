@@ -1,3 +1,6 @@
+const path = require('path');
+const fs = require('fs');
+
 const SETTINGS = {
 	diffExcludedProperties: [
 		'^__r2',
@@ -32,4 +35,6 @@ const SSE = {
 	clients: []
 }
 
-module.exports = { SETTINGS, REQUESTS, FUNCTION_LOCATIONS, SSE }
+const VERSION = JSON.parse(fs.readFileSync(path.join(__dirname, 'package.json'))).version
+
+module.exports = { SETTINGS, REQUESTS, FUNCTION_LOCATIONS, SSE, VERSION }
