@@ -8,7 +8,8 @@ const { cruise } = require("dependency-cruiser");
 
 const { SETTINGS, REQUESTS, VERSION } = require('./globals')
 
-const { handleSSERequests } = require('./sse')
+const { handleSSERequests } = require('./sse');
+const serialize = require('./public/serialize');
 
 let cruiseModules;
 
@@ -63,7 +64,7 @@ server.get('/reset', (request, response) => {
 
 server.get('/requests', function sendRequests(_, response){
 	response.set('Content-Type', 'application/json');
-	response.send(Flatted.stringify(Object.fromEntries([...REQUESTS.entries()].filter(([key]) => key !== 'latest'))));
+	response.send(JSON.stringify(serialize(Object.fromEntries([...REQUESTS.entries()].filter(([key]) => key !== 'latest')))));
 });
 server.get('/delete-request', function deleteRequest(request, response){
 	const id = +request.query.id;

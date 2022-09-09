@@ -2,8 +2,8 @@ const fs = require('fs');
 const util = require('util');
 
 const { terminalCodesToHtml } = require("terminal-codes-to-html");
-const deserialize = require('@ungap/structured-clone').deserialize;
-const serialize = require('./serialize');
+const deserialize = require('./public/deserialize');
+const serialize = require('./public/serialize');
 
 const funcLoc = require('func-loc');
 

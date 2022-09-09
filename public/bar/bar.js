@@ -59,7 +59,7 @@ function zoomToY(y) {
 }
 
 
-const requests = await fetch('/requests').then(r => r.text()).then(raw => Flatted.parse(raw))
+const requests = await fetch('/requests').then(r => r.text()).then(raw => deserialize(JSON.parse(raw)))
 const labels = Object.entries(requests).map(([_, { start: { request: { method, url } } }]) => `${method} ${url}`)
 
 const datasets = Array.from({ length: Math.max(...Object.values(requests).map(info => info.events.length)) + 1 }, (_, i) => ({ data: [], backgroundColor: CHART_COLORS[i % CHART_COLORS.length] }));

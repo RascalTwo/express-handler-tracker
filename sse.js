@@ -1,4 +1,4 @@
-const Flatted = require('flatted');
+const serialize = require('./public/serialize');
 const { MIDDLEWARE_WAIT_TIME } = require('./constants');
 
 const { SSE, REQUESTS } = require('./globals');
@@ -42,7 +42,7 @@ const startSSEPiping = async () => {
 			newRequests[chunk.id].events.sort((a, b) => a.start - b.start || a.order - b.order);
 		}
 
-		const json = Flatted.stringify(newRequests);
+		const json = JSON.stringify(serialize(newRequests));
 		for (const client of SSE.clients) client.write(`data: ${json}\n\n`);
 	}
 }

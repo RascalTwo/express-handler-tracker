@@ -9,7 +9,7 @@ export function setupEventSource(requests, onUpdate) {
 	})
 	es.addEventListener('message', event => {
 		fails = 0;
-		const newRequests = Flatted.parse(event.data);
+		const newRequests = deserialize(JSON.parse(event.data));
 		for (const [id, request] of Object.entries(newRequests)) {
 			if (!(id in requests)) {
 				requests[id] = request;

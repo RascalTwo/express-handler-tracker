@@ -656,17 +656,17 @@ window.addEventListener('keydown', ({ target, key }) => {
 	modal.addEventListener('submit', e => {
 		e.preventDefault();
 		const name = modal.querySelector('#export-data-input').value
-		localStorage.setItem(`saved-data-${name}`, Flatted.stringify(getData()))
+		localStorage.setItem(`saved-data-${name}`, JSON.stringify(serialize(getData())))
 		checkbox.checked = false;
 	})
 
 	document.querySelector('#copy-data').addEventListener('click', () => {
-		navigator.clipboard.writeText(Flatted.stringify(getData())).then(() => alert('Data copied to clipboard!'));
+		navigator.clipboard.writeText(JSON.stringify(serialize(getData()))).then(() => alert('Data copied to clipboard!'));
 	});
 
 
 	document.querySelector('#download-data').addEventListener('click', () => {
-		const blob = new Blob([Flatted.stringify(getData())], { type: 'application/json' });
+		const blob = new Blob([JSON.stringify(serialize(getData()))], { type: 'application/json' });
 		const url = URL.createObjectURL(blob);
 		const anchor = document.createElement('a');
 		anchor.style.display = 'none';
@@ -768,7 +768,7 @@ window.addEventListener('keydown', ({ target, key }) => {
 		if (inputs[1]) text = inputs[1].value;
 		if (inputs[2]) text = localStorage.getItem('saved-requests-' + localName);
 
-		const { windows, graph, styleRules, requests: newRequests } = Flatted.parse(text)
+		const { windows, graph, styleRules, requests: newRequests } = deserialize(JSON.parse(text))
 		if (windows) {
 			for (let i = 0; i < windows.length; i++) {
 				localStorage.setItem('window' + (i + 1) + '-style', windows[i])
@@ -796,7 +796,7 @@ window.addEventListener('keydown', ({ target, key }) => {
 			for (const key in requests) {
 				delete requests[key];
 			}
-			Object.assign(requests, Flatted.parse(text).requests)
+			Object.assign(requests, deserialize(JSON.parse(text)).requests)
 			renderInfo.request = Object.values(requests)[0]
 			renderInfo.middlewareIndex = 0;
 			renderRequestsSelect();
