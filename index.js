@@ -148,7 +148,6 @@ const returnHandler = (method, handler) => args => {
 		}
 	}
 
-	let originals = {};
 	let ignored = false;
 	let start;
 
@@ -159,6 +158,15 @@ const returnHandler = (method, handler) => args => {
 			return next(error);
 		}
 
+		start = performance.now();
+
+		if (!request.__r2_befores) request.__r2_befores = [];
+
+		request.__r2_befores.push({
+			request: clone(request),
+			response: clone(response)
+		})
+
 		if (!request.__r2_proxies) request.__r2_proxies = new Map();
 
 		for (const key in requestChanges) {
@@ -166,13 +174,6 @@ const returnHandler = (method, handler) => args => {
 		}
 		for (const key in responseChanges) {
 			if (!(key in response)) response[key] = responseChanges[key](request, response);
-		}
-
-		start = performance.now();
-
-		originals = {
-			request: clone(request),
-			response: clone(response)
 		}
 		next(error);
 	}
@@ -215,6 +216,8 @@ const returnHandler = (method, handler) => args => {
 				}
 			}
 		}
+
+		const originals = request.__r2_befores.pop()
 
 		const diffs = {
 			request: '',
