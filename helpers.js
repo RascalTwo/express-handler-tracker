@@ -33,7 +33,7 @@ function getProjectLines(error) {
 		if (IGNORED_STACK_SOURCES.some(ignore => source.includes(ignore))) continue;
 		lines.push(source.trim())
 	}
-	return lines;
+	return lines[0] ? [lines[0]] : [];
 }
 
 
