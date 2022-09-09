@@ -59,8 +59,8 @@ export function generateEventLabel(event) {
 	let label = 'Unknown';
 	if (event.type === 'middleware') {
 		if (event.handler.name === 'router') {
-			const constructFilename = event.handler.construct?.[0].replace(root, '').split(':').slice(0, -2)
-			const routeAddedTo = (event.handler?.code?.adds?.[1].match(/use\(('|"|`)(.*?)\1/i) || { 2: '' })[2]
+			const constructFilename = event.handler.construct?.replace(root, '').split(':').slice(0, -2)
+			const routeAddedTo = (event.handler?.code?.add?.[1].match(/use\(('|"|`)(.*?)\1/i) || { 2: '' })[2]
 			label = [routeAddedTo && `"${routeAddedTo}"` || '', constructFilename].join(' ');
 		} else label = event.handler.name ? `${event.handler.name}()` : '<anonymous>'
 	}
