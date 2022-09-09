@@ -4,13 +4,14 @@ const inspector = require("inspector");
 
 const httpMethods = require("methods")
 const funcLoc = require('func-loc');
+const jsondiffpatch = require('jsondiffpatch')
 
 const { SETTINGS, REQUESTS, FUNCTION_LOCATIONS } = require('./globals')
 const { MIDDLEWARE_WAIT_TIME } = require('./constants')
 
 const server = require('./server')
 const { startSSE } = require('./sse')
-const { getProjectLine, addRequestData, generateDiffString, getLinesFromFilepathWithLocation, getEvaluateInfo, clone, getHandlerInfo, addInfo, inspectToHTML } = require('./helpers')
+const { getProjectLine, addRequestData, getLinesFromFilepathWithLocation, getEvaluateInfo, clone, getHandlerInfo, addInfo, inspectToHTML } = require('./helpers')
 
 function errorToInfo(error) {
 	if (!error) return undefined;
@@ -58,8 +59,8 @@ const returnHandler = (method, handler) => args => {
 					end: finish,
 					type: 'finish',
 					diffs: {
-						request: generateDiffString(info.start.request, clone(request)),
-						response: generateDiffString(info.start.response, clone(response)),
+						request: jsondiffpatch.diff(info.start.request, clone(request)),
+						response: jsondiffpatch.diff(info.start.response, clone(response)),
 					}
 				});
 			})
@@ -225,7 +226,7 @@ const returnHandler = (method, handler) => args => {
 		}
 		for (const [key, obj] of [['request', request], ['response', response]]){
 			try {
-				diffs[key] = generateDiffString(originals[key], clone(obj))
+				diffs[key] = jsondiffpatch.diff(originals[key], clone(obj))
 				if (diffs[key] === 'Compared values have no visual difference.' || diffs[key] === null) diffs[key] = undefined
 			} catch (e) {
 				diffs[key] = 'Unable to inspect'

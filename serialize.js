@@ -50,8 +50,7 @@ const typeOf = value => {
 };
 
 const shouldSkip = ([TYPE, type]) => (
-  TYPE === PRIMITIVE &&
-  (type === 'function' || type === 'symbol')
+  false
 );
 
 const serializer = (strict, json, $, _) => {

@@ -214,26 +214,30 @@ document.querySelectorAll('[id^="toggleButton"]').forEach(b => b.addEventListene
 
 function updateWindowHTML(window, body, title) {
 	if (body !== undefined) {
-		//		if (body.type === 'textContent' && !window.querySelector('pre')){
-		//			window.querySelector('iframe').remove();
-		//			window.querySelector('.mainWindow').appendChild(document.createElement('pre'));
-		//		}
-		//		else if (body.type === 'innerHTML' && !window.querySelector('iframe')){
-		//			window.querySelector('pre').remove();
-		//			window.querySelector('.mainWindow').appendChild(document.createElement('iframe'));
-		//		}
-		//if (body.type === 'textContent') window.querySelector('pre').textContent = body.string;
-		const pre = window.querySelector('pre')
-		if (body.type === 'code') pre.innerHTML = '<code>' + hljs.highlightAuto(body.string).value + '</code>';
-		else pre.innerHTML = body.type === 'innerHTML' ? body.string : escapeHtml(body.string);
-		//else window.querySelector('iframe').srcdoc = `<style>.red {color: red;background-color: rgb(85, 0, 0);} .green {color: rgb(0, 255, 0);background-color: rgb(0, 85, 0);}</style><body><pre>${body.string}</pre></body>`;
+		const content = window.querySelector('.mainWindow')
+
+		if (body.type === 'diff') {
+			content.innerHTML = jsondiffpatch.formatters.html.format(body.data.delta, body.data.original)
+			jsondiffpatch.formatters.html.hideUnchanged();
+		} else {
+			let pre = content.querySelector(':scope > pre');
+			if (!pre) {
+				content.innerHTML = ''
+				pre = document.createElement('pre');
+				content.appendChild(pre);
+			}
+
+			if (body.type === 'code') pre.innerHTML = '<code>' + hljs.highlightAuto(body.string).value + '</code>';
+			else pre.innerHTML = body.type === 'innerHTML' ? body.string : escapeHtml(body.string);
+		}
+
 	}
 	if (title !== undefined) window.querySelector('.windowTitle')[title.type] = title.string;
 }
 
 /**
  * @param {number} id
- * @param {Record<'content' | 'title', { type: 'textContent' | 'innerHTML' | 'code', string: 'string' } | string>} data
+ * @param {Record<'content' | 'title', { type: 'textContent' | 'innerHTML' | 'code' | 'diff', string: 'string', data?: any } | string>} data
  */
 function renderWindow(id, { title, body }) {
 	if (typeof body === 'string') body = { type: 'innerHTML', string: body }
@@ -285,11 +289,20 @@ async function renderMiddleware() {
 	document.querySelector('#meter-wrapper').childNodes[0].nodeValue = (+duration.toFixed(0)).toLocaleString() + 'ms'
 	document.querySelector('progress').value = renderInfo.middlewareIndex + 1
 	document.querySelector('#progress-wrapper').childNodes[0].nodeValue = renderInfo.middlewareIndex + 1
-
 	if (event.diffs) {
-		renderWindow(1, { title: 'Request', body: event.diffs.request?.replace(/<R2_A>([\s\S]*?)<\/R2_A>/g, (_, string) => `<span class="red">${string}</span>`).replace(/<R2_B>([\s\S]*?)<\/R2_B>/g, (_, string) => `<span class="green">${string}</span>`) || '' });
-
-		renderWindow(2, { title: 'Response', body: event.diffs.response?.replace(/<R2_A>([\s\S]*?)<\/R2_A>/g, (_, string) => `<span class="red">${string}</span>`).replace(/<R2_B>([\s\S]*?)<\/R2_B>/g, (_, string) => `<span class="green">${string}</span>`) || '' });
+		for (const [i, key] of ['request', 'response'].entries()){
+			if (!event.diffs[key]) {
+				renderWindow(i + 1, { title: key[0].toUpperCase() + key.slice(1), body: '' });
+				continue;
+			}
+			const original = jsondiffpatch.clone(renderInfo.request.start[key])
+			for (let i = 0; i <= renderInfo.middlewareIndex; i++){
+				const delta = renderInfo.request.events[i].diffs?.[key];
+				if (!delta) continue;
+				jsondiffpatch.patch(original, delta)
+			}
+			renderWindow(i + 1, { title: key[0].toUpperCase() + key.slice(1), body: {type: 'diff', data: { original, delta: event.diffs[key] } } });
+		}
 	} else if (event.type === 'redirect') {
 		renderWindow(1, { body: '' })
 		renderWindow(2, { title: 'Redirected', body: event.path })

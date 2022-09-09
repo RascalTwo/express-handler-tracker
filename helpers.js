@@ -2,7 +2,6 @@ const fs = require('fs');
 const util = require('util');
 
 const { terminalCodesToHtml } = require("terminal-codes-to-html");
-const jestDiff = require('jest-diff');
 const deserialize = require('@ungap/structured-clone').deserialize;
 const serialize = require('./serialize');
 
@@ -106,23 +105,6 @@ function addInfo(info, data){
 }
 
 
-const aColor = string => '<R2_A>' + string + '</R2_A>'
-const bColor = string => '<R2_B>' + string + '</R2_B>'
-const commonColor = string => string
-const patchColor = string => string
-
-function generateDiffString(original, modified) {
-	return jestDiff.diff(original, modified, {
-		commonColor, patchColor, aColor, bColor,
-		aAnnotation: 'Original',
-		bAnnotation: 'Modified',
-		expand: false,
-		contextLines: 0,
-		includeChangeCounts: true
-	}).replace(/@@.*?@@\n/g, '')
-}
-
-
 function cloneButIgnore(obj, ignoredProperties, ...cloneArgs) {
 	const shallow = {};
 	for (const key in obj) {
@@ -140,4 +122,4 @@ function inspectToHTML(obj){
 	return terminalCodesToHtml(util.inspect(obj, { colors: true, numericSeparator: true, depth: null, maxArrayLength: null, maxStringLength: null, breakLength: 40 }))
 }
 
-module.exports = { delay, getProjectLine, getLinesFromFilepathWithLocation, normalizeEvent, getHandlerInfo, getEvaluateInfo, addRequestData, generateDiffString, clone, addInfo, inspectToHTML }
+module.exports = { delay, getProjectLine, getLinesFromFilepathWithLocation, normalizeEvent, getHandlerInfo, getEvaluateInfo, addRequestData, clone, addInfo, inspectToHTML }

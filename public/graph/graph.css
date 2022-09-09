@@ -1,3 +1,8 @@
+@font-face {
+	font-family: 'Bitstream Vera Sans Mono';
+	src: url(../VeraMono.ttf);
+}
+
 html,
 body {
 	overflow: hidden;
@@ -234,4 +239,13 @@ input[type="checkbox"]:not(:checked) + span {
 
 ul li::before {
 	content: none;
+}
+
+.jsondiffpatch-node ul li {
+	text-indent: 0;
+}
+
+.jsondiffpatch-node * {
+  font-family: 'Bitstream Vera Sans Mono', 'DejaVu Sans Mono', Monaco, Courier, monospace !important;
+  font-size: 20px !important;
 }
