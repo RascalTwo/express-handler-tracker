@@ -181,10 +181,9 @@ const returnHandler = (method, handler) => args => {
 		if (ignored) return next(error);
 
 		if (request.__r2_proxies.size) {
-			const proxies = [...request.__r2_proxies.values()];
-			request.__r2_proxies.clear()
-			for (const { info, url, location } of proxies) {
-				const result = proxyPromiseResults.get(info.start)
+			for (const [start, { info, url, location }] of request.__r2_proxies.entries()){
+				request.__r2_proxies.delete(start);
+				const result = proxyPromiseResults.get(info.start);
 				if (result) {
 					proxyPromiseResults.delete(info.start);
 					Object.assign(info, result);
@@ -407,11 +406,11 @@ const send = util.promisify(session.post).bind(session);
 const expressionTemplate = `
 const event = EVENT;
 typeof request === 'object' && request.__r2_proxies
-	? request.__r2_proxies.set(event.start, event)
+	? request.__r2_proxies.set(event.info.start, event)
 	: typeof req === 'object' && req.__r2_proxies
-		? req.__r2_proxies.set(event.start, event)
+		? req.__r2_proxies.set(event.info.start, event)
 		: typeof r === 'object' && r.__r2_proxies
-			? r.__r2_proxies.set(event.start, event)
+			? r.__r2_proxies.set(event.info.start, event)
 			: false;
 `.trim();
 
@@ -488,12 +487,20 @@ module.exports.proxyInstrument = function (obj, label, properties = []) {
 					send('Debugger.pause');
 					result.then = new Proxy(result.then, {
 						apply(target, thisArgument, [thenFunc, catchFunc]){
-							return Reflect.apply(target, thisArgument, [(...values) => {
-								proxyPromiseResults.set(start, { value: inspectToHTML(values), end: performance.now() })
-								return thenFunc(...values)
-							}, (...reasons) => {
-								proxyPromiseResults.set(start, { reason: inspectToHTML(reasons), end: performance.now() })
-								return catchFunc(...reasons);
+							return Reflect.apply(target, thisArgument, [value => {
+								proxyPromiseResults.set(start, { value: inspectToHTML(value), end: performance.now() })
+								return thenFunc(value)
+							}, reason => {
+								proxyPromiseResults.set(start, { reason: inspectToHTML(reason), end: performance.now() })
+								return catchFunc(reason);
+							}]);
+						}
+					})
+					result.then = new Proxy(result.then, {
+						apply(target, thisArgument, [ catchFunc]){
+							return Reflect.apply(target, thisArgument, [reason => {
+								proxyPromiseResults.set(start, { reason: inspectToHTML(reason), end: performance.now() })
+								return catchFunc(reason);
 							}]);
 						}
 					})
@@ -525,7 +532,7 @@ module.exports.proxyInstrument = function (obj, label, properties = []) {
 			return instance;
 		}
 	})
-	Object.setPrototypeOf(obj.prototype, new Proxy(Object.getPrototypeOf(obj.prototype), makeHandler(properties.filter(prop => prop in obj.prototype))));
+	if (obj.prototype) Object.setPrototypeOf(obj.prototype, new Proxy(Object.getPrototypeOf(obj.prototype) || {}, makeHandler(properties.filter(prop => prop in obj.prototype))));
 	const proxy = new Proxy(obj, makeHandler(properties))
 	proxied[obj.__r2_id] = { obj, proxy };
 	return proxy;
