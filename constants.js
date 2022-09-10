@@ -1,6 +1,6 @@
 const IGNORED_STACK_SOURCES = [
 	'node_modules',
-	'node:internal',
+	'node:',
 	'anonymous',
 	'express-handler-tracker',
 	'repl:1:1',

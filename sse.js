@@ -42,7 +42,7 @@ const startSSEPiping = async () => {
 			newRequests[chunk.id].events.sort((a, b) => a.start - b.start || a.order - b.order);
 		}
 
-		const json = JSON.stringify(serialize(newRequests));
+		const json = JSON.stringify(serialize(newRequests, { json: true }));
 		for (const client of SSE.clients) client.write(`data: ${json}\n\n`);
 	}
 }

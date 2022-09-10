@@ -295,11 +295,13 @@ async function renderMiddleware() {
 				renderWindow(i + 1, { title: key[0].toUpperCase() + key.slice(1), body: '' });
 				continue;
 			}
-			const original = jsondiffpatch.clone(renderInfo.request.start[key])
+			let original
 			for (let i = 0; i <= renderInfo.middlewareIndex; i++){
 				const delta = renderInfo.request.events[i].diffs?.[key];
 				if (!delta) continue;
-				jsondiffpatch.patch(original, delta)
+
+				if (!original) original = delta
+				else jsondiffpatch.patch(original, delta)
 			}
 			renderWindow(i + 1, { title: key[0].toUpperCase() + key.slice(1), body: {type: 'diff', data: { original, delta: event.diffs[key] } } });
 		}
@@ -413,7 +415,7 @@ async function renderMiddleware() {
 const requestSelect = document.querySelector('#requests');
 
 function generateRequestLabel(request) {
-	return request.start.request.method + ' ' + request.start.request.url
+	return request.label || (request.events[0].diffs.request.method + ' ' + request.events[0].diffs.request.url);
 }
 
 function renderRequestsSelect() {
@@ -656,17 +658,17 @@ window.addEventListener('keydown', ({ target, key }) => {
 	modal.addEventListener('submit', e => {
 		e.preventDefault();
 		const name = modal.querySelector('#export-data-input').value
-		localStorage.setItem(`saved-data-${name}`, JSON.stringify(serialize(getData())))
+		localStorage.setItem(`saved-data-${name}`, JSON.stringify(serialize(getData(), { json: true })))
 		checkbox.checked = false;
 	})
 
 	document.querySelector('#copy-data').addEventListener('click', () => {
-		navigator.clipboard.writeText(JSON.stringify(serialize(getData()))).then(() => alert('Data copied to clipboard!'));
+		navigator.clipboard.writeText(JSON.stringify(serialize(getData(), { json: true }))).then(() => alert('Data copied to clipboard!'));
 	});
 
 
 	document.querySelector('#download-data').addEventListener('click', () => {
-		const blob = new Blob([JSON.stringify(serialize(getData()))], { type: 'application/json' });
+		const blob = new Blob([JSON.stringify(serialize(getData(), { json: true }))], { type: 'application/json' });
 		const url = URL.createObjectURL(blob);
 		const anchor = document.createElement('a');
 		anchor.style.display = 'none';

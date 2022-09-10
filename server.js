@@ -3,7 +3,6 @@ const fs = require('fs')
 
 const express = require('express');
 const cors = require('cors');
-const Flatted = require('flatted')
 const { cruise } = require("dependency-cruiser");
 
 const { SETTINGS, REQUESTS, VERSION } = require('./globals')
@@ -64,7 +63,7 @@ server.get('/reset', (request, response) => {
 
 server.get('/requests', function sendRequests(_, response){
 	response.set('Content-Type', 'application/json');
-	response.send(JSON.stringify(serialize(Object.fromEntries([...REQUESTS.entries()].filter(([key]) => key !== 'latest')))));
+	response.send(JSON.stringify(serialize(Object.fromEntries([...REQUESTS.entries()].filter(([key]) => key !== 'latest')), { json: true })));
 });
 server.get('/delete-request', function deleteRequest(request, response){
 	const id = +request.query.id;

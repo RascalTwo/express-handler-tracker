@@ -37,17 +37,20 @@ const returnHandler = (method, handler) => args => {
 
 	const requestChanges = {
 		__r2_id(request, response) {
-			const id = request.headers['x-r2-id'] || performance.now();
+			const id = request.headers['x-r2-id'] || start;
 
 			const info = {
 				id,
-				start: { request: clone(request), response: clone(response) },
 				events: [],
 			}
+			addInfo(info, { start: start - 1, end: start - 1,
+				type: 'start',
+				diffs: { request: jsondiffpatch.diff({}, clone(request)), response: jsondiffpatch.diff({}, clone(response)) }
+			})
 			REQUESTS.set(id, info);
 			REQUESTS.set('latest', info);
 
-			response.on('finish', function addFinishEvent() {
+			response.on('close', function addFinishEvent() {
 				const info = REQUESTS.get(id);
 				if (!info) return;
 
@@ -59,8 +62,8 @@ const returnHandler = (method, handler) => args => {
 					end: finish,
 					type: 'finish',
 					diffs: {
-						request: jsondiffpatch.diff(info.start.request, clone(request)),
-						response: jsondiffpatch.diff(info.start.response, clone(response)),
+						request: jsondiffpatch.diff(request.__r2_last_before.request, clone(request)),
+						response: jsondiffpatch.diff(request.__r2_last_before.response, clone(response)),
 					}
 				});
 			})
@@ -163,18 +166,21 @@ const returnHandler = (method, handler) => args => {
 
 		if (!request.__r2_befores) request.__r2_befores = [];
 
-		request.__r2_befores.push({
+		const before = {
 			request: clone(request),
 			response: clone(response)
-		})
+		}
+		request.__r2_befores.push(request.__r2_last_before = before);
 
 		if (!request.__r2_proxies) request.__r2_proxies = new Map();
 
-		for (const key in requestChanges) {
-			if (!(key in request)) request[key] = requestChanges[key](request, response);
-		}
-		for (const key in responseChanges) {
-			if (!(key in response)) response[key] = responseChanges[key](request, response);
+		if (!request.__r2_id) {
+			for (const key in requestChanges) {
+				if (!(key in request)) request[key] = requestChanges[key](request, response);
+			}
+			for (const key in responseChanges) {
+				if (!(key in response)) response[key] = responseChanges[key](request, response);
+			}
 		}
 		next(error);
 	}
@@ -183,13 +189,15 @@ const returnHandler = (method, handler) => args => {
 		if (ignored) return next(error);
 
 		if (request.__r2_proxies.size) {
-			for (const [start, { info, url, location }] of request.__r2_proxies.entries()){
+			for (const [start, { info, url, location }] of request.__r2_proxies.entries()) {
 				request.__r2_proxies.delete(start);
+
 				const result = proxyPromiseResults.get(info.start);
 				if (result) {
 					proxyPromiseResults.delete(info.start);
 					Object.assign(info, result);
 				}
+
 				addRequestData(request, proxyInfoToEvent(info, url, location));
 			}
 		}
@@ -198,8 +206,8 @@ const returnHandler = (method, handler) => args => {
 			const info = REQUESTS.get(request.__r2_id)
 			if (info) {
 				let last;
-				for (const event of [...info.events.sort((a, b) => a.order - b.order)].reverse()){
-					if (event.type === 'middleware'){
+				for (const event of [...info.events.sort((a, b) => a.order - b.order)].reverse()) {
+					if (event.type === 'middleware') {
 						if (event.handler?.name === handler.name) last = event;
 						break
 					}
@@ -224,7 +232,7 @@ const returnHandler = (method, handler) => args => {
 			request: '',
 			response: ''
 		}
-		for (const [key, obj] of [['request', request], ['response', response]]){
+		for (const [key, obj] of [['request', request], ['response', response]]) {
 			try {
 				diffs[key] = jsondiffpatch.diff(originals[key], clone(obj))
 				if (diffs[key] === 'Compared values have no visual difference.' || diffs[key] === null) diffs[key] = undefined
@@ -338,9 +346,9 @@ function wrapMethods(instance, isRoute) {
 
 
 function wrapInstance(instance, options = {}) {
-	if (instance.name === 'app'){
+	if (instance.name === 'app') {
 		instance.__r2_set = instance.set;
-		instance.set = function set(...args){
+		instance.set = function set(...args) {
 			const [setting, val] = args;
 			if (typeof val !== 'string') return instance.__r2_set(...args)
 			else if (setting === 'views') SETTINGS.views.directory = val;
@@ -491,7 +499,7 @@ module.exports.proxyInstrument = function (obj, label, properties = []) {
 					stack.unshift(info);
 					send('Debugger.pause');
 					result.then = new Proxy(result.then, {
-						apply(target, thisArgument, [thenFunc, catchFunc]){
+						apply(target, thisArgument, [thenFunc, catchFunc]) {
 							return Reflect.apply(target, thisArgument, [value => {
 								proxyPromiseResults.set(start, { value: inspectToHTML(value), end: performance.now() })
 								return thenFunc(value)
@@ -502,7 +510,7 @@ module.exports.proxyInstrument = function (obj, label, properties = []) {
 						}
 					})
 					result.then = new Proxy(result.then, {
-						apply(target, thisArgument, [ catchFunc]){
+						apply(target, thisArgument, [catchFunc]) {
 							return Reflect.apply(target, thisArgument, [reason => {
 								proxyPromiseResults.set(start, { reason: inspectToHTML(reason), end: performance.now() })
 								return catchFunc(reason);
