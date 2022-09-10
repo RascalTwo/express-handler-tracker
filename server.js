@@ -65,12 +65,20 @@ server.get('/requests', function sendRequests(_, response){
 	response.set('Content-Type', 'application/json');
 	response.send(JSON.stringify(serialize(Object.fromEntries([...REQUESTS.entries()].filter(([key]) => key !== 'latest')), { json: true })));
 });
-server.get('/delete-request', function deleteRequest(request, response){
-	const id = +request.query.id;
+server.get('/delete-request/:id', function deleteRequest(request, response){
+	const id = +request.params.id;
 	if (!id) return response.status(404).end();
 	if (!REQUESTS.has(id)) return response.status(400).end();
 
 	REQUESTS.delete(id);
+	return response.status(200).end();
+})
+server.patch('/update-request/:id', express.json(), function updateRequest(request, response){
+	const id = +request.params.id;
+	if (!id) return response.status(404).end();
+	if (!REQUESTS.has(id)) return response.status(400).end();
+
+	Object.assign(REQUESTS.get(id), request.body);
 	return response.status(200).end();
 })
 

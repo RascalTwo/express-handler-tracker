@@ -300,8 +300,8 @@ async function renderMiddleware() {
 				const delta = renderInfo.request.events[i].diffs?.[key];
 				if (!delta) continue;
 
-				if (!original) original = delta
-				else jsondiffpatch.patch(original, delta)
+				if (!original) original = deserialize(serialize(delta));
+				else jsondiffpatch.patch(original, deserialize(serialize(delta)))
 			}
 			renderWindow(i + 1, { title: key[0].toUpperCase() + key.slice(1), body: {type: 'diff', data: { original, delta: event.diffs[key] } } });
 		}
@@ -439,12 +439,12 @@ function deleteRequest(id){
 	const index = Object.values(requests).findIndex(r => r.id === request.id)
 	delete requests[request.id]
 	if (renderInfo.request.id === id) renderInfo.request = Object.values(requests)[index] || Object.values(requests)[index - 1] || Object.values(requests)[0];
-	if (requestSelect.value === id) requestSelect.value = renderInfo.request.id
+	if (requestSelect.value == id) requestSelect.value = renderInfo.request.id;
 	renderRequestsSelect()
 	renderMiddlewaresSelect()
 	renderRequest()
 	renderMiddleware()
-	fetch('../delete-request?id=' + request.id).catch(console.error);
+	fetch('../delete-request/' + request.id).catch(console.error);
 }
 
 document.querySelector('#delete-request').addEventListener('click', () => {
@@ -652,6 +652,10 @@ window.addEventListener('keydown', ({ target, key }) => {
 	}
 });
 
+function updateRequestInfo(request, updates){
+	fetch('../update-request/' + request.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+}
+
 (() => {
 	const checkbox = document.querySelector('#modal-1');
 	const modal = checkbox.nextElementSibling;
@@ -714,6 +718,42 @@ window.addEventListener('keydown', ({ target, key }) => {
 		return data
 	}
 
+	function renderRequestsUL(){
+		modal.querySelector('ul').innerHTML = '';
+		modal.querySelector('ul').appendChild(Object.entries(requests).reduce((frag, [id, request]) => {
+			const li = document.createElement('li');
+			li.innerHTML = `
+				<label for="${id}-request" class="paper-check" style="display: flex;">
+					<input type="checkbox" name="paperChecks" id="${id}-request" value="option 2">
+					<span style="flex: 1;">${generateRequestLabel(request)}</span>
+					<button style="float: right;" type="button">Rename</button>
+					<button style="float: right;" type="button">Delete</button>
+				</label>
+			`;
+			const [renameButton, deleteButton] = li.querySelectorAll('button')
+			renameButton.addEventListener('click', () => {
+				const { request } = renderInfo;
+				const newLabel = prompt('New Request Name', generateRequestLabel(request))
+				if (!newLabel) return;
+				if (newLabel === generateRequestLabel(request)){
+					if (request.label) delete request.label
+					else return
+				}
+				request.label = newLabel;
+				updateRequestInfo(request, { label: newLabel })
+				renderRequestsSelect();
+				renderRequestsUL()
+			})
+			deleteButton.addEventListener('click', () => {
+				deleteRequest(id)
+				li.remove()
+			})
+
+			frag.appendChild(li);
+			return frag;
+		}, document.createDocumentFragment()));
+	}
+
 	document.querySelector('#export-data-button').addEventListener('click', () => {
 		checkbox.checked = true;
 
@@ -730,24 +770,7 @@ window.addEventListener('keydown', ({ target, key }) => {
 			return frag;
 		}, document.createDocumentFragment()));
 
-		modal.querySelector('ul').innerHTML = '';
-		modal.querySelector('ul').appendChild(Object.entries(requests).reduce((frag, [id, request]) => {
-			const li = document.createElement('li');
-			li.innerHTML = `
-				<label for="${id}-request" class="paper-check" style="display: flex;">
-					<input type="checkbox" name="paperChecks" id="${id}-request" value="option 2">
-					<span style="flex: 1;">${generateRequestLabel(request)}</span>
-					<button style="float: right;" type="button">Delete</button>
-				</label>
-			`;
-			li.querySelector('button').addEventListener('click', () => {
-				deleteRequest(id)
-				li.remove()
-			})
-
-			frag.appendChild(li);
-			return frag;
-		}, document.createDocumentFragment()));
+		renderRequestsUL()
 	});
 })();
 
