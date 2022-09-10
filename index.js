@@ -11,7 +11,7 @@ const { MIDDLEWARE_WAIT_TIME } = require('./constants')
 
 const server = require('./server')
 const { startSSE } = require('./sse')
-const { getProjectLine, addRequestData, getLinesFromFilepathWithLocation, getEvaluateInfo, clone, getHandlerInfo, addInfo, inspectToHTML } = require('./helpers')
+const { getProjectLine, addRequestData, getLinesFromFilepathWithLocation, getEvaluateInfo, clone, getHandlerInfo, addInfo, inspectToHTML, getRootDirectory } = require('./helpers')
 
 function errorToInfo(error) {
 	if (!error) return undefined;
@@ -386,7 +386,7 @@ module.exports.server = server;
 
 function proxyInfoToEvent(info, url, location) {
 	const { start, id, property, argc, argv, value, reason, end } = info
-	const line = url ? (url.split('file://')[1] + ':' + (location.lineNumber + 1) + ':' + (location.columnNumber + 1)) : undefined;
+	const line = url ? (url.split('file://')[1] + ':' + (location.lineNumber + 1) + ':' + (location.columnNumber + 1)).replace(getRootDirectory(), '') : undefined;
 	const { __r2_source: source, __r2_label: label } = proxied[id].obj
 	return {
 		start,
@@ -465,14 +465,14 @@ session.on('Debugger.paused', ({ params: { callFrames } }) => {
 const proxied = {};
 const proxyPromiseResults = new Map();
 
-module.exports.proxyInstrument = function (obj, label, properties = []) {
+module.exports.proxyInstrument = function (obj, label, { properties = [], callbackMethods = {} }) {
 	obj.__r2_source = getProjectLine();
 	obj.__r2_id = performance.now();
 	obj.__r2_label = label;
 
-	const makeHandler = properties => ({
+	const makeHandler = (properties, callbackMethods) => ({
 		get(target, property, receiver) {
-			if (properties.length && !properties.includes(property)) {
+			if (properties.length && !properties.includes(property) && !(property in callbackMethods)) {
 				return Reflect.get(target, property, receiver)
 			}
 
@@ -487,6 +487,32 @@ module.exports.proxyInstrument = function (obj, label, properties = []) {
 						argv: inspectToHTML(argumentsList),
 						argc: argumentsList.length
 					}
+					if (property in callbackMethods){
+						const indexes = [];
+						const index = callbackMethods[property]
+						if (index === true){
+							for (let i = 0; i < argumentsList.length; i++){
+								if (typeof argumentsList[i] === 'function') indexes.push(i)
+							}
+						} else {
+							const target = argumentsList.at(index)
+							if (typeof target === 'function'){
+								for (let i = 0; i < argumentsList.length; i++){
+									if (argumentsList[i] === target) indexes.push(i)
+								}
+							}
+						}
+
+						for (const i of indexes){
+							argumentsList[i] = new Proxy(argumentsList[i], {
+								apply(target, thisArgument, argumentsList){
+									proxyPromiseResults.set(start, { value: inspectToHTML(argumentsList), end: performance.now() })
+									return Reflect.apply(target, thisArgument, argumentsList);
+								}
+							})
+						}
+					}
+
 					const result = Reflect.apply(target, thisArgument, argumentsList);
 					if (typeof result !== 'object' || typeof result.then !== 'function') {
 						stack.unshift(Object.assign(info, { value: inspectToHTML(value), end: performance.now() }));
@@ -507,7 +533,7 @@ module.exports.proxyInstrument = function (obj, label, properties = []) {
 							}]);
 						}
 					})
-					result.then = new Proxy(result.then, {
+					result.catch = new Proxy(result.then, {
 						apply(target, thisArgument, [catchFunc]) {
 							return Reflect.apply(target, thisArgument, [reason => {
 								proxyPromiseResults.set(start, { reason: inspectToHTML(reason), end: performance.now() })
@@ -543,8 +569,17 @@ module.exports.proxyInstrument = function (obj, label, properties = []) {
 			return instance;
 		}
 	})
-	if (obj.prototype) Object.setPrototypeOf(obj.prototype, new Proxy(Object.getPrototypeOf(obj.prototype) || {}, makeHandler(properties.filter(prop => prop in obj.prototype))));
-	const proxy = new Proxy(obj, makeHandler(properties))
+	if (obj.prototype) Object.setPrototypeOf(
+		obj.prototype,
+		new Proxy(
+			Object.getPrototypeOf(obj.prototype) || {},
+			makeHandler(
+				properties.filter(prop => prop in obj.prototype),
+				Object.fromEntries(Object.entries(callbackMethods).filter(([prop]) => prop in obj.prototype))
+			)
+		)
+	);
+	const proxy = new Proxy(obj, makeHandler(properties, callbackMethods))
 	proxied[obj.__r2_id] = { obj, proxy };
 	return proxy;
 }

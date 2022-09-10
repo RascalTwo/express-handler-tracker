@@ -349,7 +349,7 @@ async function renderMiddleware() {
 		renderWindow(2, { title: 'Response JSON', body: event.body });
 	} else if (event.type === 'proxy-evaluate') {
 		renderWindow(1, event.args?.string ? { title: 'Arguments', body: generateProxyCallLabel(event, event.args.string.slice(1, -1)) } : { body: '' })
-		renderWindow(2, { title: 'Result', body: event.reason || event.value });
+		renderWindow(2, { title: 'Result', body: event.reason || event.value || '' });
 	}
 	renderWindow(7, {
 		title: 'Annotation',
