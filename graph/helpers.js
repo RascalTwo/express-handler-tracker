@@ -1,4 +1,4 @@
-import { renderInfo, root, views } from "./globals.js";
+import { filepathPrefix, renderInfo, root, views } from "./globals.js";
 
 export function sourceLineToID(objects, fullSrc) {
 	let src = fullSrc.split(':')[0]
@@ -14,15 +14,28 @@ export function generateViewName(name) {
 	return name + (name.endsWith(fullExt) ? '' : fullExt)
 }
 
-export function generateEventURLs(event) {
+const formatLocationSuffix = (root, line, column) => {
+	if (line === undefined) return '';
+	if (root.includes('github.com')) return '#L' + line;
+	return ':' + line + ':' + column;
+}
+
+export const generateURL = (root, path, lineNumber) => {
+	const filepath = path.includes(':') ? path.split(':').slice(0, -2).join(':') : path;
+	const [line, column] = path.includes(':') ? path.split(':').slice(-2) : [undefined, undefined];
+	const url = filepathPrefix + filepath + (lineNumber ? formatLocationSuffix(root, line, column) : '');
+	return url
+}
+
+export function generateEventURLs(event, lineNumber = true) {
 	return {
-		added: event.handler?.add && `vscode://file${event.handler.add}`,
-		evaluated: event.evaluate?.line && `vscode://file${event.evaluate.line}`,
-		construct: event.handler?.construct && `vscode://file${event.handler.construct}`,
+		added: event.handler?.add && generateURL(root, event.handler.add, lineNumber),
+		evaluated: event.evaluate?.line && generateURL(root, event.evaluate.line, lineNumber),
+		construct: event.handler?.construct && generateURL(root, event.handler.construct, lineNumber),
 		source: event.handler?.location
-			? `vscode://file${event.handler.location.path}:${event.handler.location.line}:${event.handler.location.column}`
-			: event.source && `vscode://file${event.source}`,
-		error: event.error?.line ? `vscode://file${event.error?.line}` : undefined,
+			? generateURL(root, `${event.handler.location.path}:${event.handler.location.line}:${event.handler.location.column}`, lineNumber)
+			: event.source && generateURL(root, event.source, lineNumber),
+		error: event.error?.line ? generateURL(root, event.error.line, lineNumber) : undefined,
 	}
 }
 
@@ -45,7 +58,7 @@ export function generateEventCodeHTML(event) {
 		});
 	}
 
-	return allLines.map(({ key, html }) => `${key[0].toUpperCase() + key.slice(1)} <a href="${urls[key]}">${urls[key].replace('vscode://file' + root, '')}</a><br/><code>${html}</code>`).join('<br/>');
+	return allLines.map(({ key, html }) => `${key[0].toUpperCase() + key.slice(1)} <a target="_blank" href="${urls[key]}">${urls[key].replace(filepathPrefix, '')}</a><br/><code>${html}</code>`).join('<br/>');
 }
 
 export function generateProxyCallLabel(event, content = '.'.repeat(event.args.count)) {
@@ -59,7 +72,7 @@ export function generateEventLabel(event) {
 	let label = 'Unknown';
 	if (event.type === 'middleware') {
 		if (event.handler.name === 'router') {
-			const constructFilename = event.handler.construct?.replace(root, '').split(':').slice(0, -2)
+			const constructFilename = event.handler.construct?.replace(filepathPrefix, '').split(':').slice(0, -2)
 			const routeAddedTo = (event.handler?.code?.add?.[1].match(/use\(('|"|`)(.*?)\1/i) || { 2: '' })[2]
 			label = [routeAddedTo && `"${routeAddedTo}"` || '', constructFilename].join(' ');
 		} else label = event.handler.name ? `${event.handler.name}()` : '<anonymous>'
