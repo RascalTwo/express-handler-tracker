@@ -66,6 +66,10 @@ summary {
 	text-align: end;
 }
 
+details {
+	scroll-margin-top: 55px;
+}
+
 details > a {
 	float: right;
 }

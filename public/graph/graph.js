@@ -341,7 +341,7 @@ async function renderMiddleware() {
 	const currentInAll = document.querySelector(`details[data-event-id="${event.start}"]`)
 	if (currentInAll) {
 		currentInAll.open = true;
-		currentInAll.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		currentInAll.scrollIntoView({ behavior: 'smooth' });
 		document.querySelectorAll('details.highlighted-event').forEach(e => e.classList.remove('highlighted-event'));
 		currentInAll.classList.add('highlighted-event');
 	}
