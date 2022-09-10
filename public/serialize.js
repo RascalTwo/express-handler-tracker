@@ -127,8 +127,7 @@ const serialize = (() => {
         case DATE:
           return as([TYPE, value.toISOString()], value);
         case REGEXP: {
-          const { source, flags } = value;
-          return as([TYPE, { source, flags }], value);
+          return as(['String', value.toString()], value);
         }
         case MAP: {
           const entries = [];
