@@ -8,7 +8,7 @@ import { animationDuration } from './animation-duration.js';
 
 import './theme.js';
 
-import { modules, root, views, requests, renderInfo, VERSION } from './globals.js'
+import { modules, root, views, requests, renderInfo, VERSION, isOffline } from './globals.js'
 
 marked.setOptions({
 	highlight(code, language){
@@ -50,7 +50,7 @@ document.querySelector('#eventHighlights').addEventListener('change', e => {
 	renderRequestPath()
 })
 
-setupEventSource(requests, () => {
+if (!isOffline) setupEventSource(requests, () => {
 	if (!renderInfo.request) renderInfo.request = Object.values(requests)[0]
 	renderRequest()
 	renderRequestsSelect();
@@ -102,7 +102,7 @@ function generateElements() {
 			}
 		}
 	}
-	if (Object.values(foundViews)) {
+	if (Object.values(foundViews).length) {
 		elements.push(...Object.values(foundViews))
 		if (compoundNodes) elements.push({ data: { id: views.directory, label: views.directory }, classes: `parent-${views.directory} group` })
 	}
@@ -814,8 +814,15 @@ const openMarkdownModal = (() => {
 	function getData() {
 		const data = {
 			version: VERSION,
+			paths: {
+				root: document.querySelector('#root-input').value,
+				views: {
+					directory: document.querySelector('#views-directory-input').value,
+					extension: document.querySelector('#views-extension-input').value,
+				}
+			}
 		}
-		if (modal.querySelector('#layout-windows-checkbox').checked) data.windows = Array.from({ length: 6 }, (_, i) => localStorage.getItem('window' + (i + 1) + '-style'))
+		if (modal.querySelector('#layout-windows-checkbox').checked) data.windows = Array.from({ length: 7 }, (_, i) => localStorage.getItem('window' + (i + 1) + '-style'))
 		if (modal.querySelector('#layout-graph-checkbox').checked) data.graph = {
 			modules,
 			positions: cy.nodes().reduce((locs, n) => ({ ...locs, [n.id()]: n.position() }), {}),
@@ -872,6 +879,11 @@ const openMarkdownModal = (() => {
 
 		modal.reset()
 
+
+		document.querySelector('#root-input').value = root;
+		document.querySelector('#views-directory-input').value = views.directory;
+		document.querySelector('#views-extension-input').value = views.extension;
+
 		const datalist = document.querySelector('#export-data-datalist')
 		datalist.innerHTML = '';
 		datalist.appendChild(Object.keys(localStorage).reduce((frag, key) => {
@@ -896,22 +908,34 @@ const openMarkdownModal = (() => {
 
 		let text;
 		const inputs = ['import-data-file', 'import-data-text', 'import-data-select'].map(name => modal.querySelector('#' + name, e))
-		if (inputs[0]) {
+		if (inputs[0].files[0]) {
 			text = await new Promise(resolve => {
 				const reader = new FileReader();
 				reader.onload = (e) => resolve(e.target.result);
-				reader.readAsText(file)
+				reader.readAsText(inputs[0].files[0])
 			})
 		}
-		if (inputs[1]) text = inputs[1].value;
-		if (inputs[2]) text = localStorage.getItem('saved-requests-' + localName);
+		if (inputs[1].value) text = inputs[1].value;
+		if (inputs[2].value) text = localStorage.getItem('saved-requests-' + localName);
 
-		const { windows, graph, styleRules, requests: newRequests } = deserialize(JSON.parse(text))
+		const { windows, graph, styleRules, requests: newRequests, paths, VERSION } = deserialize(JSON.parse(text))
 		if (windows) {
 			for (let i = 0; i < windows.length; i++) {
 				localStorage.setItem('window' + (i + 1) + '-style', windows[i])
 			}
 			renderInitialWindows();
+		}
+		if (newRequests){
+			localStorage.setItem('importing-requests', JSON.stringify(serialize(newRequests)))
+			for (const key in requests) {
+				delete requests[key];
+			}
+			Object.assign(requests, newRequests)
+			renderInfo.request = Object.values(requests)[0]
+			renderInfo.middlewareIndex = 0;
+			renderRequestsSelect();
+			renderMiddlewaresSelect();
+			renderRequest();
 		}
 		if (graph) {
 			modules.splice(0, modules.length)
@@ -927,20 +951,14 @@ const openMarkdownModal = (() => {
 		}
 		if (styleRules) {
 			localStorage.setItem('style-rules', JSON.stringify(styleRules))
-			renderStyleRules()
-			updateStyles()
 		}
-		if (newRequests){
-			for (const key in requests) {
-				delete requests[key];
-			}
-			Object.assign(requests, deserialize(JSON.parse(text)).requests)
-			renderInfo.request = Object.values(requests)[0]
-			renderInfo.middlewareIndex = 0;
-			renderRequestsSelect();
-			renderMiddlewaresSelect();
-			renderRequest();
-		}
+		localStorage.setItem('importing-info', JSON.stringify({
+			...paths,
+			VERSION,
+			modules: graph?.modules || []
+		}))
+		renderStyleRules();
+		updateStyles();
 	})
 
 	const select = document.querySelector('#import-data-select')
