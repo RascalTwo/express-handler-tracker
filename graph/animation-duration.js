@@ -4,5 +4,5 @@ export let animationDuration = 1000;
 	range.addEventListener('change', () => {
 		animationDuration = +range.value
 	})
-	animationDuration = range.value;
+	animationDuration = +range.value;
 })();

@@ -1,3 +1,8 @@
+@font-face {
+	font-family: 'Bitstream Vera Sans Mono';
+	src: url(../VeraMono.ttf);
+}
+
 html,
 body {
 	overflow: hidden;
@@ -57,8 +62,16 @@ html.dark .background-primary {
 	height: 100%;
 }
 
+.window > div:first-of-type > span button {
+	padding: 0;
+}
+
 summary {
 	text-align: end;
+}
+
+details {
+	scroll-margin-top: 55px;
 }
 
 details > a {
@@ -230,8 +243,18 @@ input[type="checkbox"]:not(:checked) + span {
 
 .modal-body {
 	max-height: 85vh;
+	overflow: scroll;
 }
 
 ul li::before {
 	content: none;
+}
+
+.jsondiffpatch-node ul li {
+	text-indent: 0;
+}
+
+.jsondiffpatch-node * {
+  font-family: 'Bitstream Vera Sans Mono', 'DejaVu Sans Mono', Monaco, Courier, monospace !important;
+  font-size: 20px !important;
 }

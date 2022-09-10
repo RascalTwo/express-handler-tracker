@@ -46,14 +46,6 @@
 	font-size: 24px;
 }
 
-[id^="toggleButton"] {
-	color: white;
-	cursor: pointer;
-	position: relative;
-	bottom: 9px;
-	font-size: 24px;
-}
-
 .windowGroup {
 	justify-content: center;
 	display: flex;

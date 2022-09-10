@@ -10,6 +10,12 @@ import './theme.js';
 
 import { modules, root, views, requests, renderInfo, VERSION } from './globals.js'
 
+marked.setOptions({
+	highlight(code, language){
+		return hljs.highlight(code, { language }).value
+	}
+})
+
 let compoundNodes = document.querySelector('#groups').checked
 document.querySelector('#groups').addEventListener('change', e => {
 	compoundNodes = e.currentTarget.checked;
@@ -31,6 +37,19 @@ document.querySelector('#allNodes').addEventListener('change', e => {
 	renderRequestPath();
 })
 
+let eventNumbers = document.querySelector('#eventNumbers').checked
+document.querySelector('#eventNumbers').addEventListener('change', e => {
+	eventNumbers = e.currentTarget.checked;
+	renderRequestPath()
+})
+
+
+let eventHighlights = document.querySelector('#eventHighlights').checked
+document.querySelector('#eventHighlights').addEventListener('change', e => {
+	eventHighlights = e.currentTarget.checked;
+	renderRequestPath()
+})
+
 setupEventSource(requests, () => {
 	if (!renderInfo.request) renderInfo.request = Object.values(requests)[0]
 	renderRequest()
@@ -48,8 +67,9 @@ function generateElements() {
 			const next = parentNames[i + 1];
 			if (!(current in parentNames)) parents[current] = { data: { id: current, label: current, parent: next }, classes: 'group parent-' + current }
 		}
+		const label = mod.source.split('/').at(-1)
 		return {
-			data: { id: mod.source, parent: compoundNodes ? parentNames[0] : undefined, label: mod.source.split('/').at(-1), href: `vscode://file${root}${mod.source}` },
+			data: { id: mod.source, parent: compoundNodes ? parentNames[0] : undefined, label, baseLabel: label, href: `vscode://file${root}${mod.source}` },
 			classes: parentNames[0] ? 'parent-' + parentNames[0] : undefined
 		}
 	})
@@ -69,10 +89,11 @@ function generateElements() {
 	for (const req of Object.values(requests)) {
 		for (const event of req.events) {
 			if (event.type === 'view') {
-				const caller = event.evaluate.lines.length && sourceLineToID(elements, event.evaluate.lines[0])
-				const id = views.directory + '/' + generateViewName(event.name)
+				const caller = event.evaluate.line && sourceLineToID(elements, event.evaluate.line)
+				const label = generateViewName(event.name)
+				const id = views.directory + '/' + label
 				foundViews[event.name] = {
-					data: { id, label: generateViewName(event.name), parent: compoundNodes && views.directory },
+					data: { id, label, baseLabel: label, parent: compoundNodes && views.directory },
 					classes: 'parent-' + views.directory
 				}
 				if (caller) {
@@ -192,48 +213,53 @@ select.addEventListener('change', (e) => {
 	cy.layout(LAYOUTS[value]).run()
 })
 
-document.querySelectorAll('[id^="toggleButton"]').forEach(b => b.addEventListener('click', () => {
-	const window = b.closest('.window');
-	const body = JSON.parse(window.dataset.body)
-	body.type = body.type === 'textContent' ? 'innerHTML' : 'textContent'
-	window.dataset.body = JSON.stringify(body);
-	const title = JSON.parse(window.dataset.title)
-	title.type = title.type === 'textContent' ? 'innerHTML' : 'textContent'
-	window.dataset.title = JSON.stringify(title);
 
-	updateWindowHTML(window, body, title);
-}));
-
-function updateWindowHTML(window, body, title) {
+function updateWindowHTML(window, body, title, ...buttons) {
 	if (body !== undefined) {
-		//		if (body.type === 'textContent' && !window.querySelector('pre')){
-		//			window.querySelector('iframe').remove();
-		//			window.querySelector('.mainWindow').appendChild(document.createElement('pre'));
-		//		}
-		//		else if (body.type === 'innerHTML' && !window.querySelector('iframe')){
-		//			window.querySelector('pre').remove();
-		//			window.querySelector('.mainWindow').appendChild(document.createElement('iframe'));
-		//		}
-		//if (body.type === 'textContent') window.querySelector('pre').textContent = body.string;
-		const pre = window.querySelector('pre')
-		if (body.type === 'code') pre.innerHTML = '<code>' + hljs.highlightAuto(body.string).value + '</code>';
-		else pre.innerHTML = body.type === 'innerHTML' ? body.string : escapeHtml(body.string);
-		//else window.querySelector('iframe').srcdoc = `<style>.red {color: red;background-color: rgb(85, 0, 0);} .green {color: rgb(0, 255, 0);background-color: rgb(0, 85, 0);}</style><body><pre>${body.string}</pre></body>`;
+		const content = window.querySelector('.mainWindow')
+
+		if (body.type === 'diff') {
+			content.innerHTML = jsondiffpatch.formatters.html.format(body.data.delta, body.data.original)
+			jsondiffpatch.formatters.html.hideUnchanged();
+		} else if (body.type === 'markdown'){
+			content.innerHTML = marked.parse(body.string);
+		} else {
+			let pre = content.querySelector(':scope > pre');
+			if (!pre) {
+				content.innerHTML = ''
+				pre = document.createElement('pre');
+				content.appendChild(pre);
+			}
+
+			if (body.type === 'code') pre.innerHTML = '<code>' + hljs.highlightAuto(body.string).value + '</code>';
+			else pre.innerHTML = body.type === 'innerHTML' ? body.string : escapeHtml(body.string);
+		}
+
 	}
 	if (title !== undefined) window.querySelector('.windowTitle')[title.type] = title.string;
+
+	const buttonContainer = window.children[0].querySelector('span');
+	buttonContainer.innerHTML = '';
+	for (const info of buttons){
+		const button = document.createElement('button')
+		for (const key in info){
+			button[key] = info[key]
+		}
+		buttonContainer.appendChild(button)
+	}
 }
 
 /**
  * @param {number} id
- * @param {Record<'content' | 'title', { type: 'textContent' | 'innerHTML' | 'code', string: 'string' } | string>} data
+ * @param {Record<'content' | 'title', { type: 'textContent' | 'innerHTML' | 'code' | 'diff', string: 'string', data?: any } | string>} data
  */
-function renderWindow(id, { title, body }) {
+function renderWindow(id, { title, body }, ...buttons) {
 	if (typeof body === 'string') body = { type: 'innerHTML', string: body }
 	if (typeof title === 'string') title = { type: 'innerHTML', string: title }
 	const window = document.querySelector(`#window${id}`);
 	window.dataset.body = JSON.stringify(body);
 	window.dataset.title = JSON.stringify(title);
-	updateWindowHTML(window, body, title)
+	updateWindowHTML(window, body, title, ...buttons)
 }
 
 function generateEventNodes(event, forward) {
@@ -257,6 +283,30 @@ function generateEventNodes(event, forward) {
 	return nodes;
 }
 
+function generateEventTooltipContent(event, urls){
+	let content = document.createElement('div');
+
+	content.innerHTML = generateEventLabel(event);
+	content.innerHTML += '<br/>' + Object.entries(urls).filter(([_, url]) => url && !url.includes('node_modules') && !url.includes('express-handler-tracker')).reduce((lines, [name, url]) => [...lines, `<a href="${url}">${name[0].toUpperCase() + name.slice(1)}</a>`], []).join('<br/>')
+
+	return content;
+}
+
+async function jumpToAnnotatedEvent(change){
+	let found = null;
+	for (let i = renderInfo.middlewareIndex + change; i >= 0 && i < renderInfo.request.events.length; i += change){
+		if (!renderInfo.request.events[i].annotation) continue;
+		found = i;
+		break;
+	}
+	if (found === null) return;
+	while (renderInfo.middlewareIndex !== found) {
+		renderInfo.middlewareIndex += change;
+		await renderMiddleware()
+		await new Promise(r => setTimeout(r, 100));
+	}
+}
+
 async function renderMiddleware() {
 	if (!renderInfo.request) return
 	document.querySelector('#events').value = renderInfo.middlewareIndex;
@@ -268,11 +318,23 @@ async function renderMiddleware() {
 	document.querySelector('#meter-wrapper').childNodes[0].nodeValue = (+duration.toFixed(0)).toLocaleString() + 'ms'
 	document.querySelector('progress').value = renderInfo.middlewareIndex + 1
 	document.querySelector('#progress-wrapper').childNodes[0].nodeValue = renderInfo.middlewareIndex + 1
-
 	if (event.diffs) {
-		renderWindow(1, { title: 'Request', body: event.diffs.request.replace(/<R2_A>([\s\S]*?)<\/R2_A>/g, (_, string) => `<span class="red">${string}</span>`).replace(/<R2_B>([\s\S]*?)<\/R2_B>/g, (_, string) => `<span class="green">${string}</span>`) });
+		for (const [i, key] of ['request', 'response'].entries()){
+			if (!event.diffs[key]) {
+				renderWindow(i + 1, { title: key[0].toUpperCase() + key.slice(1), body: '' });
+				continue;
+			}
+			let original
+			for (let i = 0; i <= renderInfo.middlewareIndex; i++){
+				const delta = renderInfo.request.events[i].diffs?.[key];
+				if (!delta) continue;
 
-		renderWindow(2, { title: 'Response', body: event.diffs.response.replace(/<R2_A>([\s\S]*?)<\/R2_A>/g, (_, string) => `<span class="red">${string}</span>`).replace(/<R2_B>([\s\S]*?)<\/R2_B>/g, (_, string) => `<span class="green">${string}</span>`) });
+				if (!original) original = deserialize(serialize(delta));
+				else try { jsondiffpatch.patch(original, deserialize(serialize(delta)))}
+				catch(e) { console.error(e, original, delta, e) }
+			}
+			renderWindow(i + 1, { title: key[0].toUpperCase() + key.slice(1), body: {type: 'diff', data: { original, delta: event.diffs[key] } } });
+		}
 	} else if (event.type === 'redirect') {
 		renderWindow(1, { body: '' })
 		renderWindow(2, { title: 'Redirected', body: event.path })
@@ -289,6 +351,22 @@ async function renderMiddleware() {
 		renderWindow(1, event.args?.string ? { title: 'Arguments', body: generateProxyCallLabel(event, event.args.string.slice(1, -1)) } : { body: '' })
 		renderWindow(2, { title: 'Result', body: event.reason || event.value });
 	}
+	renderWindow(7, {
+		title: 'Annotation',
+		body: { type: 'markdown', string: event.annotation || '' } },
+		{
+			innerHTML: 'Previous',
+			onclick: () => jumpToAnnotatedEvent(-1)
+		},
+		{
+			innerHTML: 'Edit',
+			onclick: () => openMarkdownModal(renderInfo.request.id, event.start, event.annotation || '# Markdown-Powered!')
+		},
+		{
+			innerHTML: 'Next',
+			onclick: () => jumpToAnnotatedEvent(1)
+		}
+	);
 
 	const urls = generateEventURLs(event)
 	const remaining = [...(event.type === 'view' ? [views.directory + '/' + generateViewName(event.name)] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse()];
@@ -298,29 +376,29 @@ async function renderMiddleware() {
 	w5.innerHTML = generateEventCodeHTML(event);
 	attachRenderListeners(w5)
 
-	const currentInAll = document.querySelector(`details[data-event-id="${event.start + '' + event.order}"]`)
+	const currentInAll = document.querySelector(`details[data-event-id="${event.start}"]`)
 	if (currentInAll) {
 		currentInAll.open = true;
-		currentInAll.scrollIntoView({ behavior: 'smooth', block: 'center' });
+		currentInAll.scrollIntoView({ behavior: 'smooth' });
 		document.querySelectorAll('details.highlighted-event').forEach(e => e.classList.remove('highlighted-event'));
 		currentInAll.classList.add('highlighted-event');
 	}
 
-	if (!remaining.length) remaining.push(renderInfo.lastNode.data('id'))
+	const remainingNodes = generateEventNodes(event).reverse()
+	if (!renderInfo.forward) remainingNodes.reverse()
+
+	if (!remainingNodes.length) remainingNodes.push(renderInfo.lastNode)
 
 	disableButtons()
-	while (remaining.length) {
-		const url = remaining.pop()
-		const target = sourceLineToID(Object.values(cy.elements()).map(cye => {
-			if (typeof cye?.data === 'function') return { data: cye.data() }
-			else return { data: {} }
-		}), url)
+	await new Promise(r => setTimeout(r, 100));
+	while (remainingNodes.length) {
+		const target = remainingNodes.pop()
 
-		let node = cy.filter(e => e.data('id') === target?.data.id)[0];
+		let node = target
 		if (node) renderInfo.lastNode = node;
 		else node = renderInfo.lastNode;
 
-		if (!node) return;
+		if (!node) continue;
 
 		/*const nextReq = renderInfo.request.events[renderInfo.middlewareIndex + (renderInfo.forward ? 1 : -1)]
 		if (nextReq) {
@@ -341,20 +419,14 @@ async function renderMiddleware() {
 			allowHTML: true,
 			appendTo: document.body,
 			interactive: true,
+			placement: 'bottom',
 			hideOnClick: false,
 			duration: [0, 0],
 			zIndex: 50,
 
 			// your own custom props
 			// content prop can be used when the target is a single element https://atomiks.github.io/tippyjs/v6/constructor/#prop
-			content: () => {
-				let content = document.createElement('div');
-
-				content.innerHTML = generateEventLabel(event);
-				content.innerHTML += '<br/>' + Object.entries(urls).filter(([_, url]) => url && !url.includes('node_modules') && !url.includes('express-handler-tracker')).reduce((lines, [name, url]) => [...lines, `<a href="${url}">${name[0].toUpperCase() + name.slice(1)}</a>`], []).join('<br/>')
-
-				return content;
-			}
+			content: generateEventTooltipContent.bind(null, event, urls)
 		})
 		else {
 			function percentileDiff(a, b, percent) {
@@ -379,25 +451,18 @@ async function renderMiddleware() {
 				}
 			}
 
-			renderInfo.tip.setContent(() => {
-				let content = document.createElement('div');
-
-				content.innerHTML = generateEventLabel(event);
-				content.innerHTML += '<br/>' + Object.entries(urls).filter(([_, url]) => url && !url.includes('node_modules') && !url.includes('express-handler-tracker')).reduce((lines, [name, url]) => [...lines, `<a href="${url}">${name[0].toUpperCase() + name.slice(1)}</a>`], []).join('<br/>')
-
-				return content;
-			})
+			renderInfo.tip.setContent(generateEventTooltipContent(event, urls))
 			if (JSON.stringify(from) !== JSON.stringify(to)) await new Promise(r => setTimeout(r, animationDuration));
 		}
 		renderInfo.tip.show();
 	}
-	enableButtons()
+	setTimeout(() => enableButtons(), 100);
 }
 
 const requestSelect = document.querySelector('#requests');
 
 function generateRequestLabel(request) {
-	return request.start.request.method + ' ' + request.start.request.url
+	return request.label || (request.events[0].diffs.request.method + ' ' + request.events[0].diffs.request.url);
 }
 
 function renderRequestsSelect() {
@@ -416,17 +481,21 @@ function renderRequestsSelect() {
 }
 renderRequestsSelect()
 
-document.querySelector('#delete-request').addEventListener('click', () => {
-	if (!renderInfo.request) return;
-	const { request } = renderInfo
+function deleteRequest(id){
+	const request = requests[id];
 	const index = Object.values(requests).findIndex(r => r.id === request.id)
 	delete requests[request.id]
-	renderInfo.request = Object.values(requests)[index] || Object.values(requests)[0];
+	if (renderInfo.request.id === id) renderInfo.request = Object.values(requests)[index] || Object.values(requests)[index - 1] || Object.values(requests)[0];
+	if (requestSelect.value == id) requestSelect.value = renderInfo.request.id;
 	renderRequestsSelect()
 	renderMiddlewaresSelect()
 	renderRequest()
 	renderMiddleware()
-	fetch('../delete-request?id=' + request.id).catch(console.error);
+	fetch('../delete-request/' + request.id).catch(console.error);
+}
+
+document.querySelector('#delete-request').addEventListener('click', () => {
+	if (renderInfo.request) deleteRequest(renderInfo.request.id);
 })
 
 
@@ -475,31 +544,89 @@ function renderMiddlewaresSelect() {
 
 function attachRenderListeners(parent) {
 	document.querySelectorAll('details').forEach(d => d.querySelector('button').addEventListener('click', () =>
-		changeMiddleware(renderInfo.request.events.findIndex(e => e.start + '' + e.order === d.dataset.eventId))
+		changeMiddleware(renderInfo.request.events.findIndex(e => e.start == d.dataset.eventId))
 	))
 }
 
-function renderRequestPath() {
-	cy.edges('.request-edge').removeClass('request-edge');
-	cy.nodes('.request-node').removeClass('request-node');
+function extractRanges(numbers) {
+	if (!numbers.length) return '';
 
-	const nodeIDs = new Set();
-	for (const [i, event] of renderInfo.request.events.entries()) {
-		const nextEvent = renderInfo.request.events[i + 1]
-		if (nextEvent) [
-			...generateEventNodes(event, renderInfo.forward).map(node => node.data('id')),
-			...generateEventNodes(nextEvent, renderInfo.forward).map(node => node.data('id'))
-		].forEach(nodeIDs.add, nodeIDs);
-	}
-	const edgeIDs = new Set()
-	for (const from of nodeIDs) {
-		for (const to of nodeIDs) {
-			if (from === to) continue;
-			edgeIDs.add(`${from}-${to}`)
+	let ranges = [];
+	let start = numbers[0];
+
+	function addCurrentRange(last) {
+		const rangeLength = last - start;
+		if (rangeLength < 2) {
+			ranges.push(...Array.from({ length: rangeLength + 1 }, (_, i) => (i + start).toString()));
+		} else {
+			ranges.push(`${start}-${last}`);
 		}
 	}
-	cy.filter(e => edgeIDs.has(e.data('id'))).addClass('request-edge');
-	cy.filter(n => nodeIDs.has(n.data('id'))).addClass('request-node');
+
+	for (let i = 1; i < numbers.length; i++) {
+		const current = numbers[i];
+		const last = numbers[i - 1];
+
+		if (current - last !== 1) {
+			addCurrentRange(last);
+			start = current;
+		}
+	}
+	addCurrentRange(numbers[numbers.length - 1]);
+
+	return ranges.join(',');
+}
+
+function renderRequestPath() {
+	cy.edges('.request-edge').removeClass('request-edge')
+	cy.nodes('.request-node').removeClass('request-node')
+
+	const nodeIDs = [];
+	const nodeIndexes = [];
+	const edgeIDs = [];
+	const edgeIndexes = [];
+	for (const [i, event] of renderInfo.request.events.entries()) {
+		const nextEvent = renderInfo.request.events[i + 1]
+		if (!nextEvent) continue;
+		for (const from of generateEventNodes(event, true).map(node => node.data('id'))) {
+			nodeIDs.push(from);
+			nodeIndexes.push(i + 1);
+			for (const to of generateEventNodes(nextEvent, true).map(node => node.data('id'))) {
+				if (from === to) continue;
+				edgeIDs.push(`${from}-${to}`);
+				edgeIndexes.push(i + 2);
+				edgeIDs.push(`${to}-${from}`);
+				edgeIndexes.push(i + 2);
+				nodeIDs.push(to);
+				nodeIndexes.push(i + 2);
+			}
+		}
+	}
+	cy.filter(e => edgeIDs.includes(e.data('id'))).addClass('request-edge').data('label', '').data('order', []);
+	cy.filter(n => nodeIDs.includes(n.data('id'))).addClass('request-node').data('order', []).forEach(n => n.data('label', n.data('baseLabel') || n.data('label')));
+
+	const indexing = {}
+	if (eventNumbers) {
+		for (const [i, edgeID] of [...edgeIDs].entries()) {
+			const edge = cy.$(`[id="${edgeID}"]`)
+			if (!edge.length) continue
+			edge.data('order', [...(edge.data('order') || []), edgeIndexes[i]]);
+			indexing[edgeID] = edge;
+		}
+		for (const [i, nodeID] of [...nodeIDs].entries()) {
+			const node = cy.$(`[id="${nodeID}"]`)
+			if (!node.length) continue
+
+			node.data('order', [...(node.data('order') || []), nodeIndexes[i]]);
+			indexing[nodeID] = node;
+		}
+		for (const entity of Object.values(indexing)) {
+			const oldLabel = entity.data('label');
+			const nums = extractRanges(entity.data('order').filter((o, i, arr) => arr.indexOf(o) === i))
+			if (oldLabel) entity.data('label', oldLabel + '\n' + nums)
+			else entity.data('label', nums)
+		}
+	}
 
 
 	cy.edges('.hidden').removeClass('hidden');
@@ -515,6 +642,10 @@ function renderRequestPath() {
 		cy.nodes('*').not('.request-node').addClass('hidden')
 		cy.nodes('.request-node').removeClass('request-node');
 	}
+	if (!eventHighlights){
+		cy.nodes('.request-node').removeClass('request-node');
+		cy.edges('.request-edge').removeClass('request-edge');
+	}
 }
 function renderRequest() {
 	renderInfo.middlewareIndex = 0;
@@ -522,6 +653,7 @@ function renderRequest() {
 	renderWindow(2, { body: '' })
 	renderWindow(5, { body: '' })
 	renderWindow(6, { body: '' })
+	renderWindow(7, { body: '' })
 	renderMiddleware();
 	renderBubbles()
 	renderMiddlewaresSelect()
@@ -534,7 +666,7 @@ function renderRequest() {
 		let nextHTML = generateEventCodeHTML(e);
 		if (nextHTML === lastHTML || lastHTML.includes(nextHTML)) nextHTML = 'SAME'
 		if (nextHTML !== 'SAME') lastHTML = nextHTML
-		w6.innerHTML += `<details open data-event-id="${e.start + '' + e.order}"><summary>${generateEventLabel(e)} <button>Render</button></summary>${nextHTML === 'SAME' ? 'Same as previous' : nextHTML}</details>`
+		w6.innerHTML += `<details open data-event-id="${e.start}"><summary>${generateEventLabel(e)} <button>Render</button></summary>${nextHTML === 'SAME' ? 'Same as previous' : nextHTML}</details>`
 	}
 	attachRenderListeners(w6)
 	renderRequestPath()
@@ -563,8 +695,8 @@ document.querySelector('#reset-all').addEventListener('click', () => {
 });
 
 window.addEventListener('keydown', ({ target, key }) => {
-	if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA') return
-	switch (key){
+	if (target.tagName === 'INPUT' || target.tagName === 'TEXTAREA' || target.tagName === 'SELECT') return
+	switch (key) {
 		case 'ArrowLeft':
 		case 'ArrowRight':
 			changeMiddleware(Math.min(Math.max(renderInfo.middlewareIndex + (key === 'ArrowLeft' ? -1 : 1), 0), renderInfo.request.events.length - 1));
@@ -572,18 +704,101 @@ window.addEventListener('keydown', ({ target, key }) => {
 	}
 });
 
+function updateRequestInfo(request, updates){
+	fetch('../update-request/' + request.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+}
+
+function updateAnnotation(requestId, eventStart, updates){
+	fetch('../update-event/' + requestId + '/' + eventStart, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+}
+
+function downloadBlob(blob, filename){
+	const url = URL.createObjectURL(blob);
+	const anchor = document.createElement('a');
+	anchor.style.display = 'none';
+	anchor.href = url;
+	anchor.download = filename;
+	document.body.appendChild(anchor);
+	anchor.click();
+	URL.revokeObjectURL(url);
+	anchor.remove();
+}
+
+document.querySelector('#save-as-png').addEventListener('click', () => {
+	window.open(cy.png({
+		bg: document.querySelector('#transparentBackground').checked
+			? 'transparent'
+			: document.querySelector('#darkTheme').checked
+				? '#41403e'
+				: 'white',
+		full: true
+	}), '_blank')
+});
+
+document.querySelector('#save-as-svg').addEventListener('click', () => {
+	const svgWindow = window.open("", 'SVG', '_blank')
+	svgWindow.document.body.innerHTML = cy.svg({
+		bg: document.querySelector('#transparentBackground').checked
+			? 'transparent'
+			: document.querySelector('#darkTheme').checked
+				? '#41403e'
+				: 'white',
+		full: true
+	})
+});
+
+const openMarkdownModal = (() => {
+	const checkbox = document.querySelector('#modal-3');
+	const modal = checkbox.nextElementSibling;
+
+	let info = {};
+
+	const openMarkdownModal = (requestId, eventStart, initialText) => {
+		Object.assign(info, { requestId, eventStart })
+		modal.elements[0].value = initialText
+		checkbox.checked = true;
+		modal.elements[0].focus()
+	}
+
+	modal.addEventListener('submit', e => {
+		e.preventDefault()
+
+		const newAnnotation = modal.elements[0].value;
+		const event = requests[info.requestId].events.find(e => e.start === info.eventStart);
+		if (!newAnnotation) {
+			if (event.annotation === undefined) return
+			delete event.annotation
+		}
+		event.annotation = newAnnotation;
+		updateAnnotation(info.requestId, event.start, { annotation: newAnnotation });
+		renderMiddleware();
+		checkbox.checked = false;
+	})
+
+	return openMarkdownModal;
+})();
+
 (() => {
 	const checkbox = document.querySelector('#modal-1');
 	const modal = checkbox.nextElementSibling;
 	modal.addEventListener('submit', e => {
 		e.preventDefault();
-		const name = modal.querySelector('#export-requests-input').value
-		localStorage.setItem(`saved-requests-${name}`, Flatted.stringify(getSelectedRequests()))
+		const name = modal.querySelector('#export-data-input').value
+		localStorage.setItem(`saved-data-${name}`, JSON.stringify(serialize(getData(), { json: true })))
 		checkbox.checked = false;
 	})
 
+	document.querySelector('#copy-data').addEventListener('click', () => {
+		navigator.clipboard.writeText(JSON.stringify(serialize(getData(), { json: true }))).then(() => alert('Data copied to clipboard!'));
+	});
+
+
+	document.querySelector('#download-data').addEventListener('click', () => {
+		downloadBlob(new Blob([JSON.stringify(serialize(getData(), { json: true }))], { type: 'application/json' }), 'data.json');
+	});
+
 	document.querySelector('#all-button').addEventListener('click', () => {
-		const checkboxes = [...modal.querySelectorAll('input[type="checkbox"]')]
+		const checkboxes = [...modal.querySelectorAll('ul input[type="checkbox"]')]
 		const newValue = !checkboxes.every(c => c.checked)
 		for (const checkbox of checkboxes) {
 			checkbox.checked = newValue;
@@ -591,129 +806,14 @@ window.addEventListener('keydown', ({ target, key }) => {
 	});
 
 	document.querySelector('#invert-button').addEventListener('click', () => {
-		for (const checkbox of modal.querySelectorAll('input[type="checkbox"]')) {
+		for (const checkbox of modal.querySelectorAll('ul input[type="checkbox"]')) {
 			checkbox.checked = !checkbox.checked;
 		}
 	});
 
-	function getSelectedRequests() {
-		return {
-			version: VERSION,
-			requests: Object.fromEntries([...modal.querySelectorAll('input[type="checkbox"]:checked')].map(checkbox => {
-				const id = checkbox.id.split('-')[0];
-				return [id, requests[id]];
-			}))
-		}
-	}
-
-	document.querySelector('#copy-requests').addEventListener('click', () => {
-		navigator.clipboard.writeText(Flatted.stringify(getSelectedRequests())).then(() => alert('Requests copied to clipboard!'));
-	});
-
-
-	document.querySelector('#download-requests').addEventListener('click', () => {
-		const blob = new Blob([Flatted.stringify(getSelectedRequests())], { type: 'application/json' });
-		const url = URL.createObjectURL(blob);
-		const anchor = document.createElement('a');
-		anchor.style.display = 'none';
-		anchor.href = url;
-		anchor.download = 'requests.json';
-		document.body.appendChild(anchor);
-		anchor.click();
-		URL.revokeObjectURL(url);
-		anchor.remove();
-	});
-
-	document.querySelector('#export-requests').addEventListener('click', () => {
-		checkbox.checked = true;
-
-		modal.reset()
-
-		const datalist = document.querySelector('#export-requests-datalist')
-		datalist.innerHTML = '';
-		datalist.appendChild(Object.keys(localStorage).reduce((frag, key) => {
-			if (!key.startsWith('saved-requests-')) return frag;
-			const name = key.split('saved-requests-')[1];
-			const option = document.createElement('option');
-			option.textContent = name;
-			frag.appendChild(option);
-			return frag;
-		}, document.createDocumentFragment()));
-
-		modal.querySelector('ul').appendChild(Object.entries(requests).reduce((frag, [id, request]) => {
-			const li = document.createElement('li');
-			li.innerHTML = `
-				<label for="${id}-request" class="paper-check">
-					<input type="checkbox" name="paperChecks" id="${id}-request" value="option 2"> <span>${generateRequestLabel(request)}</span>
-				</label>
-			`;
-
-			frag.appendChild(li);
-			return frag;
-		}, document.createDocumentFragment()));
-	});
-})();
-
-
-(() => {
-	const checkbox = document.querySelector('#modal-2');
-	const modal = checkbox.nextElementSibling;
-	modal.addEventListener('submit', e => e.preventDefault())
-
-	const select = document.querySelector('#import-requests-select')
-	select.innerHTML = '';
-	select.appendChild(Object.keys(localStorage).reduce((frag, key) => {
-		if (!key.startsWith('saved-requests-')) return frag;
-		const name = key.split('saved-requests-')[1];
-		const option = document.createElement('option');
-		option.textContent = name;
-		frag.appendChild(option);
-		return frag;
-	}, document.createDocumentFragment()));
-
-	document.querySelector('#import-requests').addEventListener('click', () => {
-		checkbox.checked = true;
-
-		modal.reset()
-		return new Promise(async (resolve, reject) => {
-			while (checkbox.checked) await new Promise(r => setTimeout(r, 1000));
-			const localName = document.querySelector('#import-requests-select').value
-			if (localName) return resolve(localStorage.getItem('saved-requests-' + localName))
-			const text = document.querySelector('#import-requests-text').value
-			if (text) return resolve(text)
-			const file = document.querySelector('#import-requests-file').files[0]
-			if (!file) return reject(new Error('No data given'));
-			const reader = new FileReader();
-			reader.onload = (e) => resolve(e.target.result);
-			reader.readAsText(file);
-		}).then(text => {
-			for (const key in requests) {
-				delete requests[key];
-			}
-			Object.assign(requests, Flatted.parse(text).requests)
-			renderInfo.request = Object.values(requests)[0]
-			renderInfo.middlewareIndex = 0;
-			renderRequestsSelect();
-			renderMiddlewaresSelect();
-			renderRequest();
-		});
-	});
-})();
-
-
-(() => {
-	const checkbox = document.querySelector('#modal-3');
-	const modal = checkbox.nextElementSibling;
-	modal.addEventListener('submit', e => {
-		e.preventDefault();
-		const name = modal.querySelector('#export-layout-input').value
-		localStorage.setItem(`saved-layout-${name}`, Flatted.stringify(getSelectedData()))
-		checkbox.checked = false;
-	})
-
-	function getSelectedData() {
+	function getData() {
 		const data = {
-			version: VERSION
+			version: VERSION,
 		}
 		if (modal.querySelector('#layout-windows-checkbox').checked) data.windows = Array.from({ length: 6 }, (_, i) => localStorage.getItem('window' + (i + 1) + '-style'))
 		if (modal.querySelector('#layout-graph-checkbox').checked) data.graph = {
@@ -723,102 +823,140 @@ window.addEventListener('keydown', ({ target, key }) => {
 			pan: cy.pan()
 		}
 		if (modal.querySelector('#layout-style-rules').checked) data.styleRules = JSON.parse(localStorage.getItem('style-rules') || '{}');
+		const selectedRequests = Object.fromEntries([...modal.querySelectorAll('ul input[type="checkbox"]:checked')].map(checkbox => {
+			const id = checkbox.id.split('-')[0];
+			return [id, requests[id]];
+		}))
+		if (Object.keys(selectedRequests).length) data.requests = selectedRequests;
 		return data
 	}
 
-	document.querySelector('#copy-layout').addEventListener('click', () => {
-		navigator.clipboard.writeText(Flatted.stringify(getSelectedData())).then(() => alert('Layout copied to clipboard!'));
-	});
+	function renderRequestsUL(){
+		modal.querySelector('ul').innerHTML = '';
+		modal.querySelector('ul').appendChild(Object.entries(requests).reduce((frag, [id, request]) => {
+			const li = document.createElement('li');
+			li.innerHTML = `
+				<label for="${id}-request" class="paper-check" style="display: flex;">
+					<input type="checkbox" name="paperChecks" id="${id}-request" value="option 2">
+					<span style="flex: 1;">${generateRequestLabel(request)}</span>
+					<button style="float: right;" type="button">Rename</button>
+					<button style="float: right;" type="button">Delete</button>
+				</label>
+			`;
+			const [renameButton, deleteButton] = li.querySelectorAll('button')
+			renameButton.addEventListener('click', () => {
+				const { request } = renderInfo;
+				const newLabel = prompt('New Request Name', generateRequestLabel(request))
+				if (!newLabel) return;
+				if (newLabel === generateRequestLabel(request)){
+					if (request.label) delete request.label
+					else return
+				}
+				request.label = newLabel;
+				updateRequestInfo(request, { label: newLabel })
+				renderRequestsSelect();
+				renderRequestsUL()
+			})
+			deleteButton.addEventListener('click', () => {
+				deleteRequest(id)
+				li.remove()
+			})
 
+			frag.appendChild(li);
+			return frag;
+		}, document.createDocumentFragment()));
+	}
 
-	document.querySelector('#download-layout').addEventListener('click', () => {
-		const blob = new Blob([Flatted.stringify(getSelectedData())], { type: 'application/json' });
-		const url = URL.createObjectURL(blob);
-		const anchor = document.createElement('a');
-		anchor.style.display = 'none';
-		anchor.href = url;
-		anchor.download = 'layout.json';
-		document.body.appendChild(anchor);
-		anchor.click();
-		URL.revokeObjectURL(url);
-		anchor.remove();
-	});
-
-	document.querySelector('#export-layout').addEventListener('click', () => {
+	document.querySelector('#export-data-button').addEventListener('click', () => {
 		checkbox.checked = true;
+
 		modal.reset()
 
-		const datalist = document.querySelector('#export-layout-datalist')
+		const datalist = document.querySelector('#export-data-datalist')
 		datalist.innerHTML = '';
 		datalist.appendChild(Object.keys(localStorage).reduce((frag, key) => {
-			if (!key.startsWith('saved-layout-')) return frag;
-			const name = key.split('saved-layout-')[1];
+			if (!key.startsWith('saved-data-')) return frag;
+			const name = key.split('saved-data-')[1];
 			const option = document.createElement('option');
 			option.textContent = name;
 			frag.appendChild(option);
 			return frag;
 		}, document.createDocumentFragment()));
+
+		renderRequestsUL()
 	});
 })();
 
 
 (() => {
-	const checkbox = document.querySelector('#modal-4');
+	const checkbox = document.querySelector('#modal-2');
 	const modal = checkbox.nextElementSibling;
-	modal.addEventListener('submit', e => e.preventDefault())
+	modal.addEventListener('submit', async (e) => {
+		e.preventDefault()
 
-	document.querySelector('#import-layout').addEventListener('click', () => {
+		let text;
+		const inputs = ['import-data-file', 'import-data-text', 'import-data-select'].map(name => modal.querySelector('#' + name, e))
+		if (inputs[0]) {
+			text = await new Promise(resolve => {
+				const reader = new FileReader();
+				reader.onload = (e) => resolve(e.target.result);
+				reader.readAsText(file)
+			})
+		}
+		if (inputs[1]) text = inputs[1].value;
+		if (inputs[2]) text = localStorage.getItem('saved-requests-' + localName);
+
+		const { windows, graph, styleRules, requests: newRequests } = deserialize(JSON.parse(text))
+		if (windows) {
+			for (let i = 0; i < windows.length; i++) {
+				localStorage.setItem('window' + (i + 1) + '-style', windows[i])
+			}
+			renderInitialWindows();
+		}
+		if (graph) {
+			modules.splice(0, modules.length)
+			modules.push(...graph.modules)
+			cy.json({ elements: generateElements() })
+			for (const [id, { x, y }] of Object.entries(graph.positions).sort((a, b) => a[0].split('/').length - b[0].split('/').length)) {
+				cy.$(`[id="${id}"]`)?.position({ x, y })
+				locations.update(id, { x, y })
+			}
+			cy.zoom(graph.zoom)
+			cy.pan(graph.pan)
+			localStorage.setItem('info', JSON.stringify({ zoom: graph.zoom, pan: graph.pan }));
+		}
+		if (styleRules) {
+			localStorage.setItem('style-rules', JSON.stringify(styleRules))
+			renderStyleRules()
+			updateStyles()
+		}
+		if (newRequests){
+			for (const key in requests) {
+				delete requests[key];
+			}
+			Object.assign(requests, deserialize(JSON.parse(text)).requests)
+			renderInfo.request = Object.values(requests)[0]
+			renderInfo.middlewareIndex = 0;
+			renderRequestsSelect();
+			renderMiddlewaresSelect();
+			renderRequest();
+		}
+	})
+
+	const select = document.querySelector('#import-data-select')
+	select.innerHTML = '';
+	select.appendChild(Object.keys(localStorage).reduce((frag, key) => {
+		if (!key.startsWith('saved-data-')) return frag;
+		const name = key.split('saved-data-')[1];
+		const option = document.createElement('option');
+		option.textContent = name;
+		frag.appendChild(option);
+		return frag;
+	}, document.createDocumentFragment()));
+
+	document.querySelector('#import-data-button').addEventListener('click', () => {
 		checkbox.checked = true;
 
-		const select = document.querySelector('#import-layout-select')
-		select.innerHTML = '';
-		select.appendChild(Object.keys(localStorage).reduce((frag, key) => {
-			if (!key.startsWith('saved-layout-')) return frag;
-			const name = key.split('saved-layout-')[1];
-			const option = document.createElement('option');
-			option.textContent = name;
-			frag.appendChild(option);
-			return frag;
-		}, document.createDocumentFragment()));
-
 		modal.reset()
-		return new Promise(async (resolve, reject) => {
-			while (checkbox.checked) await new Promise(r => setTimeout(r, 1000));
-			const localName = document.querySelector('#import-layout-select').value
-			if (localName) return resolve(localStorage.getItem('saved-layout-' + localName))
-			const text = document.querySelector('#import-layout-text').value
-			if (text) return resolve(text)
-			const file = document.querySelector('#import-layout-file').files[0]
-			if (!file) return reject(new Error('No data given'));
-			const reader = new FileReader();
-			reader.onload = (e) => resolve(e.target.result);
-			reader.readAsText(file);
-		}).then(text => {
-			const { windows, graph, styleRules } = Flatted.parse(text)
-			if (windows) {
-				for (let i = 0; i < windows.length; i++) {
-					localStorage.setItem('window' + (i + 1) + '-style', windows[i])
-				}
-				renderInitialWindows();
-			}
-			if (graph) {
-				modules.splice(0, modules.length)
-				modules.push(...graph.modules)
-				cy.json({ elements: generateElements() })
-				for (const [id, { x, y }] of Object.entries(graph.positions).sort((a, b) => a[0].split('/').length - b[0].split('/').length)) {
-					cy.$(`[id="${id}"]`)?.position({ x, y })
-					locations.update(id, { x, y })
-				}
-				cy.zoom(graph.zoom)
-				cy.pan(graph.pan)
-				localStorage.setItem('info', JSON.stringify({ zoom: graph.zoom, pan: graph.pan }));
-			}
-			if (styleRules) {
-				localStorage.setItem('style-rules', JSON.stringify(styleRules))
-				renderStyleRules()
-				updateStyles()
-			}
-		});
 	});
 })();
-

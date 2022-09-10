@@ -8,7 +8,8 @@
 
 		<link rel="stylesheet" href="../paper.min.css" />
 
-		<script src="../flatted.min.js"></script>
+		<script src="../deserialize.js"></script>
+		<script src="../serialize.js"></script>
 		<script src="library/cytoscape.min.js"></script>
 
 		<script src="library/cola.js"></script>
@@ -41,6 +42,10 @@
 		<script
 			src="//cdnjs.cloudflare.com/ajax/libs/highlightjs-line-numbers.js/2.8.0/highlightjs-line-numbers.min.js"></script>
 		<link href="graph.css" rel="stylesheet" />
+		<script src="library/jsondiffpatch/jsondiffpatch.umd.js"></script>
+		<link rel="stylesheet" href="library/jsondiffpatch/html.css" type="text/css" />
+		<script src="library/cytoscape-svg.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.1.0/marked.min.js" integrity="sha512-DZIC9m2IbFlio5GE2oKD6/veW6NXML5Cbo9FHnba7Q9R4OCPelWw9R5QpupcPPLSv0euhuRr+5JV5pWl3X3nSg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 	</head>
 
 	<body>
@@ -49,7 +54,7 @@
 		<span id="tooltippy"></span>
 
 		<div class="windowGroup">
-			<div id="window1" class="window data black fade small">
+			<div id="window1" class="window black fade small">
 				<div class="purple">
 					<p class="windowTitle">Request</p>
 				</div>
@@ -58,7 +63,7 @@
 					<pre></pre>
 				</div>
 			</div>
-			<div id="window2" class="window data black fade small">
+			<div id="window2" class="window black fade small">
 				<div class="orange">
 					<p class="windowTitle">Response</p>
 				</div>
@@ -96,6 +101,17 @@
 									</div>
 								</label>
 							</span>
+							<span class="form-group">
+								<label for="eventNumbers" class="paper-switch-label">
+									Event Numbers
+								</label>
+								<label class="paper-switch">
+									<input id="eventNumbers" name="eventNumbers" type="checkbox" checked />
+									<span class="paper-switch-slider"></span>
+								</label>
+							</span>
+						</div>
+						<div class="toggles-wrapper">
 							Nodes
 							<span class="form-group">
 								<label for="allNodes" class="paper-switch-tile">
@@ -116,19 +132,23 @@
 									</div>
 								</label>
 							</span>
+							<span class="form-group">
+								<label for="eventHighlights" class="paper-switch-label">
+									Request Highlights
+								</label>
+								<label class="paper-switch">
+									<input id="eventHighlights" name="eventHighlights" type="checkbox" checked />
+									<span class="paper-switch-slider"></span>
+								</label>
+							</span>
 						</div>
 						<label for="animation-duration">Animation Duration (ms)</label>
 						<div class="form-group"><input type="range" id="animation-duration" min="0" max="2000" step="100"
 								value="1000"></div>
-						<label>Layout</label>
+						<label>Data</label>
 						<div>
-							<button id="export-layout">Export</button>
-							<button id="import-layout">Import</button>
-						</div>
-						<label>Requests</label>
-						<div>
-							<button id="export-requests">Export</button>
-							<button id="import-requests">Import</button>
+							<button id="export-data-button">Export</button>
+							<button id="import-data-button">Import</button>
 						</div>
 						<div class="style-rules-wrapper">
 							<button id="add-rule">Add Style Rule</button>
@@ -182,6 +202,15 @@
 					<pre></pre>
 				</div>
 			</div>
+			<div id="window7" class="window fade black small">
+				<div class="green">
+					<p class="windowTitle">Annotation</p>
+				</div>
+				<br /><br />
+				<div class="mainWindow">
+					<pre></pre>
+				</div>
+			</div>
 		</div>
 
 
@@ -190,6 +219,7 @@
 			<button id="button4">Events</button>
 			<button id="button1">Request</button>
 			<button id="button2">Response</button>
+			<button id="button7">Annotation</button>
 			<button id="button5">Current Code</button>
 			<button id="button6">All Code</button>
 			<span id="meter-wrapper">
@@ -211,48 +241,7 @@
 			<label class="modal-bg" for="modal-1"></label>
 			<div class="modal-body">
 				<label class="btn-close" for="modal-1">X</label>
-				<h4 class="modal-title">Export Requests</h4>
-				<button type="button" id="invert-button">Invert</button>
-				<button type="button" id="all-button">All</button>
-				<ul class="form-group" style="max-height: 33vh; overflow: scroll; padding: 1rem;">
-				</ul>
-				<button type="button" id="download-requests">Download</button>
-				<button type="button" id="copy-requests">Copy</button>
-				<div class="form-group" autocomplete="off">
-					<label for="export-requests-input">Local Storage</label>
-					<input placeholder="Nice input" id="export-requests-input" list="export-requests-datalist">
-					<datalist id="export-requests-datalist">
-					</datalist>
-					<button>Export</button>
-				</div>
-
-				<label for="modal-1">Close</label>
-			</div>
-		</form>
-
-		<input class="modal-state" id="modal-2" type="checkbox" autocomplete="off">
-		<form class="modal">
-			<label class="modal-bg" for="modal-2"></label>
-			<div class="modal-body">
-				<label class="btn-close" for="modal-2">X</label>
-				<h4 class="modal-title">Import Requests</h4>
-				<input id="import-requests-file" type="file" />
-				<textarea id="import-requests-text"></textarea>
-				<div autocomplete="off">
-					<label for="import-requests-select">Local Storage</label>
-					<div class="form-group"><select id="import-requests-select"></select></div>
-				</div>
-
-				<label for="modal-2">Import</label>
-			</div>
-		</form>
-
-		<input class="modal-state" id="modal-3" type="checkbox" autocomplete="off">
-		<form class="modal">
-			<label class="modal-bg" for="modal-3"></label>
-			<div class="modal-body">
-				<label class="btn-close" for="modal-3">X</label>
-				<h4 class="modal-title">Export Layout</h4>
+				<h4 class="modal-title">Export Data</h4>
 				<div class="form-group">
 					<label for="layout-windows-checkbox" class="paper-check">
 						<input type="checkbox" name="paperChecks" id="layout-windows-checkbox"> <span>Windows</span>
@@ -264,34 +253,63 @@
 						<input type="checkbox" name="paperChecks" id="layout-style-rules"> <span>Style Rules</span>
 					</label>
 				</div>
-				<button type="button" id="download-layout">Download</button>
-				<button type="button" id="copy-layout">Copy</button>
+				<fieldset>
+					<legend>Requests</legend>
+					<button type="button" id="invert-button">Invert</button>
+					<button type="button" id="all-button">All</button>
+					<ul class="form-group" style="max-height: 33vh; overflow: scroll; padding: 1rem;">
+					</ul>
+				</fieldset>
+				<button type="button" id="download-data">Download</button>
+				<button type="button" id="copy-data">Copy</button>
 				<div class="form-group" autocomplete="off">
-					<label for="export-layout-input">Local Storage</label>
-					<input placeholder="Nice input" id="export-layout-input" list="export-layout-datalist">
-					<datalist id="export-layout-datalist">
+					<label for="export-data-input">Local Storage</label>
+					<input id="export-data-input" list="export-data-datalist">
+					<datalist id="export-data-datalist">
 					</datalist>
 					<button>Export</button>
 				</div>
-
-				<label for="modal-3">Close</label>
+				<fieldset>
+					<legend>Images</legend>
+					<div class="form-group">
+						<label for="transparentBackground" class="paper-switch-label">
+							Transparent Background
+						</label>
+						<label class="paper-switch">
+							<input id="transparentBackground" name="transparentBackground" type="checkbox" checked />
+							<span class="paper-switch-slider"></span>
+						</label>
+					</div>
+					<button type="button" id="save-as-png">PNG</button>
+					<button type="button" id="save-as-svg">SVG</button>
+				</fieldset>
 			</div>
 		</form>
 
-		<input class="modal-state" id="modal-4" type="checkbox" autocomplete="off">
+		<input class="modal-state" id="modal-2" type="checkbox" autocomplete="off">
 		<form class="modal">
-			<label class="modal-bg" for="modal-4"></label>
+			<label class="modal-bg" for="modal-2"></label>
 			<div class="modal-body">
-				<label class="btn-close" for="modal-4">X</label>
-				<h4 class="modal-title">Import Layout</h4>
-				<input id="import-layout-file" type="file" />
-				<textarea id="import-layout-text"></textarea>
+				<label class="btn-close" for="modal-2">X</label>
+				<h4 class="modal-title">Import Data</h4>
+				<input id="import-data-file" type="file" />
+				<textarea id="import-data-text"></textarea>
 				<div autocomplete="off">
-					<label for="import-layout-select">Local Storage</label>
-					<div class="form-group"><select id="import-layout-select"></select></div>
+					<label for="import-data-select">Local Storage</label>
+					<div class="form-group"><select id="import-data-select"></select></div>
 				</div>
+				<button>Import</button>
+			</div>
+		</form>
 
-				<label for="modal-4">Import</label>
+		<input class="modal-state" id="modal-3" type="checkbox" autocomplete="off">
+		<form class="modal">
+			<label class="modal-bg" for="modal-3"></label>
+			<div class="modal-body">
+				<label class="btn-close" for="modal-3">X</label>
+				<h4 class="modal-title">Set Annotation Markdown</h4>
+				<textarea autocomplete="off"></textarea>
+				<button>Set</button>
 			</div>
 		</form>
 

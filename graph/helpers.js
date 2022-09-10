@@ -16,13 +16,13 @@ export function generateViewName(name) {
 
 export function generateEventURLs(event) {
 	return {
-		added: event.handler?.adds?.[0]?.length && `vscode://file${event.handler.adds[0][0]}`,
-		evaluated: event.evaluate?.lines.length && `vscode://file${event.evaluate.lines[0]}`,
-		construct: event.handler?.construct?.length && `vscode://file${event.handler.construct[0]}`,
+		added: event.handler?.add && `vscode://file${event.handler.add}`,
+		evaluated: event.evaluate?.line && `vscode://file${event.evaluate.line}`,
+		construct: event.handler?.construct && `vscode://file${event.handler.construct}`,
 		source: event.handler?.location
 			? `vscode://file${event.handler.location.path}:${event.handler.location.line}:${event.handler.location.column}`
 			: event.source && `vscode://file${event.source}`,
-		error: event.error?.lines.length ? `vscode://file${event.error?.lines[0]}` : undefined,
+		error: event.error?.line ? `vscode://file${event.error?.line}` : undefined,
 	}
 }
 
@@ -30,7 +30,7 @@ export function generateEventCodeHTML(event) {
 	const urls = generateEventURLs(event)
 
 	const codes = Object.fromEntries(Object.entries({
-		added: event.handler?.code?.adds,
+		added: event.handler?.code?.add,
 		evaluated: event.evaluate?.code,
 		construct: event.handler?.code?.construct,
 		source: event.handler?.code?.location || event.code,
@@ -59,8 +59,8 @@ export function generateEventLabel(event) {
 	let label = 'Unknown';
 	if (event.type === 'middleware') {
 		if (event.handler.name === 'router') {
-			const constructFilename = event.handler.construct?.[0].replace(root, '').split(':').slice(0, -2)
-			const routeAddedTo = (event.handler?.code?.adds?.[1].match(/use\(('|"|`)(.*?)\1/i) || { 2: '' })[2]
+			const constructFilename = event.handler.construct?.replace(root, '').split(':').slice(0, -2)
+			const routeAddedTo = (event.handler?.code?.add?.[1].match(/use\(('|"|`)(.*?)\1/i) || { 2: '' })[2]
 			label = [routeAddedTo && `"${routeAddedTo}"` || '', constructFilename].join(' ');
 		} else label = event.handler.name ? `${event.handler.name}()` : '<anonymous>'
 	}
@@ -70,6 +70,9 @@ export function generateEventLabel(event) {
 	else if (event.type === 'json') label = 'response.json()'
 	else if (event.type === 'proxy-evaluate') label = generateProxyCallLabel(event);
 	if (event.end && event.start) label += ' - ' + (event.end - event.start).toFixed(2) + 'ms';
+
+	if (event.type === 'start') label = `Started`
 	if (event.type === 'finish') label = `Finished in ${(event.end - renderInfo.request.id).toFixed(2)} ms`
+
 	return label
 }

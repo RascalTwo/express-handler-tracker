@@ -1,7 +1,7 @@
 
 
 
-export const requests = await fetch('../requests').then(r => r.text()).then(raw => Flatted.parse(raw)).catch(err => {
+export const requests = await fetch('../requests').then(r => r.text()).then(raw => deserialize(JSON.parse(raw))).catch(err => {
 	console.error(err);
 	return {};
 });

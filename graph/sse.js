@@ -9,7 +9,7 @@ export function setupEventSource(requests, onUpdate) {
 	})
 	es.addEventListener('message', event => {
 		fails = 0;
-		const newRequests = Flatted.parse(event.data);
+		const newRequests = deserialize(JSON.parse(event.data));
 		for (const [id, request] of Object.entries(newRequests)) {
 			if (!(id in requests)) {
 				requests[id] = request;
@@ -23,7 +23,7 @@ export function setupEventSource(requests, onUpdate) {
 				else requests[id].events.push(event);
 			}
 
-			requests[id].events.sort((a, b) => a.start - b.start || a.order - b.order);
+			requests[id].events.sort((a, b) => a.start - b.start);
 		}
 		onUpdate()
 	});

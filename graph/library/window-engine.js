@@ -17,18 +17,13 @@ function createWindow(id) {
     let headerID = windowID.firstElementChild;
     headerID.id = "window" + id + "header";
 
-    if (document.getElementById("window" + id).classList.contains('data')) {
-        let createToggleButton = document.createElement("b");
-        createToggleButton.id = "toggleButton" + id;
-        createToggleButton.innerHTML = "🗘";
-        document.getElementById("window" + id + "header").appendChild(createToggleButton);
-    }
+    const customContainer = document.createElement('span')
+    document.getElementById("window" + id + "header").appendChild(customContainer);
 
     let createCloseButton = document.createElement("b");
     createCloseButton.id = "closeButton" + id;
     createCloseButton.innerHTML = "×";
     document.getElementById("window" + id + "header").appendChild(createCloseButton);
-
     document.getElementById("closeButton" + id).onclick = function () {
         fadeOut(windowID);
         document.getElementById("button" + id).className = '';
@@ -175,12 +170,14 @@ function renderInitialWindows() {
     document.querySelector('#window4').setAttribute('style', window.localStorage.getItem("window4-style") || '');
     document.querySelector('#window5').setAttribute('style', window.localStorage.getItem("window5-style") || '');
     document.querySelector('#window6').setAttribute('style', window.localStorage.getItem("window6-style") || '');
+    document.querySelector('#window7').setAttribute('style', window.localStorage.getItem("window7-style") || '');
     document.querySelector('#button1').className = +document.querySelector('#window1').style.opacity ? 'btn-success' : ''
     document.querySelector('#button2').className = +document.querySelector('#window2').style.opacity ? 'btn-success' : ''
     document.querySelector('#button3').className = +document.querySelector('#window3').style.opacity ? 'btn-success' : ''
     document.querySelector('#button4').className = +document.querySelector('#window4').style.opacity ? 'btn-success' : ''
     document.querySelector('#button5').className = +document.querySelector('#window5').style.opacity ? 'btn-success' : ''
     document.querySelector('#button6').className = +document.querySelector('#window6').style.opacity ? 'btn-success' : ''
+    document.querySelector('#button7').className = +document.querySelector('#window7').style.opacity ? 'btn-success' : ''
 }
 renderInitialWindows()
 
@@ -190,11 +187,12 @@ document.querySelector('#button3').addEventListener('click', () => setTimeout(()
 document.querySelector('#button4').addEventListener('click', () => setTimeout(() => localStorage.setItem(`window4-style`, document.querySelector('#window' + 4).getAttribute('style')), 1000));
 document.querySelector('#button5').addEventListener('click', () => setTimeout(() => localStorage.setItem(`window5-style`, document.querySelector('#window' + 5).getAttribute('style')), 1000));
 document.querySelector('#button6').addEventListener('click', () => setTimeout(() => localStorage.setItem(`window6-style`, document.querySelector('#window' + 6).getAttribute('style')), 1000));
+document.querySelector('#button7').addEventListener('click', () => setTimeout(() => localStorage.setItem(`window7-style`, document.querySelector('#window' + 7).getAttribute('style')), 1000));
 document.querySelector('#reset-windows').addEventListener('click', () => {
     for (const child of document.querySelector('.windowGroup').children) {
         child.removeAttribute('style');
     }
-    for (let i = 1; i <= 6; i++) {
+    for (let i = 1; i <= 7; i++) {
         document.querySelector('#button' + i).className = '';
         setTimeout((i) => localStorage.setItem(`window${i}-style`, document.querySelector('#window' + i).getAttribute('style')), 1000, i);
     }
