@@ -1,5 +1,6 @@
 const fs = require('fs');
 const util = require('util');
+const path = require('path')
 
 const { terminalCodesToHtml } = require("terminal-codes-to-html");
 const deserialize = require('./public/deserialize');
@@ -12,6 +13,10 @@ const { SETTINGS, REQUESTS, FUNCTION_LOCATIONS, SSE } = require('./globals');
 
 function delay(ms) {
 	return new Promise(r => setTimeout(r, ms));
+}
+
+function getRootDirectory(){
+	return path.dirname(path.resolve(SETTINGS.entryPoint)) + '/'
 }
 
 Error.stackTraceLimit = STACK_TRACE_LIMIT;
@@ -28,7 +33,7 @@ function getProjectLine(error) {
 	for (const line of (container.stack || '').split('at ').slice(1)) {
 		const source = line.split('(').slice(1).join('(').split(')').slice(0, -1).join(')') || line
 		if (IGNORED_STACK_SOURCES.some(ignore => source.includes(ignore))) continue;
-		return source.trim()
+		return source.trim().replace(getRootDirectory(), '')
 	}
 }
 
@@ -56,10 +61,11 @@ async function normalizeEvent(event) {
 
 
 function getHandlerInfo(handler) {
+	const root = getRootDirectory();
 	const obj = {
 		name: handler.name,
-		add: handler.__r2_add_line,
-		construct: handler.__r2_construct_line,
+		add: handler.__r2_add_line?.replace(root, ''),
+		construct: handler.__r2_construct_line?.replace(root, ''),
 		code: {
 			add: handler.__r2_add_line ? getLinesFromFilepathWithLocation(handler.__r2_add_line) : undefined,
 			construct: handler.__r2_construct_line ? getLinesFromFilepathWithLocation(handler.__r2_construct_line) : undefined,
@@ -68,10 +74,12 @@ function getHandlerInfo(handler) {
 	(FUNCTION_LOCATIONS.has(handler) || handler.__r2_location ? Promise.resolve(FUNCTION_LOCATIONS.get(handler) || handler.__r2_location) : funcLoc.locate(handler).then(loc => FUNCTION_LOCATIONS.set(handler, loc).get(handler))).then(loc => {
 		if (!loc || IGNORED_STACK_SOURCES.some(ignore => loc.path.includes(ignore))) return
 
-		obj.location = loc
-
 		if (!('code' in obj)) obj.code = {};
 		obj.code.location = getLinesFromFilepathWithLocation(`${loc.path}:${loc.line}-${loc.line + handler.toString().split('\n').length}:${loc.column}`)
+
+		obj.location = loc
+		delete obj.location.source;
+		obj.location.path = obj.location.path.replace(root, '');
 	});
 
 	if (!Object.values(obj.code).filter(Boolean).length) delete obj.code;
@@ -91,7 +99,6 @@ function addRequestData(request, data) {
 	const info = REQUESTS.get(request.__r2_id);
 	if (!info) return;
 	addInfo(info, data);
-	info.end = { request: clone(request), response: clone(request.res) }
 }
 
 function addInfo(info, data){
@@ -121,4 +128,4 @@ function inspectToHTML(obj){
 	return terminalCodesToHtml(util.inspect(obj, { colors: true, numericSeparator: true, depth: null, maxArrayLength: null, maxStringLength: null, breakLength: 40 }))
 }
 
-module.exports = { delay, getProjectLine, getLinesFromFilepathWithLocation, normalizeEvent, getHandlerInfo, getEvaluateInfo, addRequestData, clone, addInfo, inspectToHTML }
+module.exports = { delay, getProjectLine, getLinesFromFilepathWithLocation, normalizeEvent, getHandlerInfo, getEvaluateInfo, addRequestData, clone, addInfo, inspectToHTML, getRootDirectory }

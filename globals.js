@@ -13,7 +13,7 @@ const SETTINGS = {
 		'^host$',
 		'^sessionStore$'
 	].map(s => new RegExp(s)),
-	entryPoint: undefined,
+	entryPoint: process.cwd() + '/index.js',
 	views: {
 		directory: undefined,
 		extension: undefined

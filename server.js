@@ -10,6 +10,7 @@ const { SETTINGS, REQUESTS, VERSION } = require('./globals')
 
 const { handleSSERequests } = require('./sse');
 const serialize = require('./public/serialize');
+const { getRootDirectory } = require('./helpers');
 
 let cruiseModules;
 
@@ -29,7 +30,7 @@ server.get('/graph', function renderGraphPage(_, response){
 	response.sendFile(path.join(__dirname, 'public/graph/graph.html'))
 });
 server.get('/info', function sendDependencyInfo(_, response){
-	const root = path.dirname(path.resolve(SETTINGS.entryPoint)) + '/'
+	const root = getRootDirectory();
 	const viewsRelativeDirectory = path.relative(root, SETTINGS.views.directory)
 
 	if (!cruiseModules) {

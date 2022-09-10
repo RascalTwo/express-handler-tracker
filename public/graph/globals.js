@@ -27,6 +27,7 @@ export const { modules, root, views, VERSION } = await (async () => {
 		return getLocalInfo()
 	});
 })();
+export const filepathPrefix = root.startsWith('http') ? root : 'vscode://file' + root
 
 
 export const renderInfo = {

@@ -1,14 +1,14 @@
 import { LAYOUTS } from './constants.js'
 
 import { generateStylesheet, renderStyleRules, updateStyles } from './style-rules.js'
-import { sourceLineToID, generateViewName, generateEventURLs, generateEventCodeHTML, generateEventLabel, generateProxyCallLabel } from './helpers.js'
+import { sourceLineToID, generateViewName, generateEventURLs, generateEventCodeHTML, generateEventLabel, generateProxyCallLabel, generateURL } from './helpers.js'
 import { setupEventSource } from './sse.js';
 
 import { animationDuration } from './animation-duration.js';
 
 import './theme.js';
 
-import { modules, root, views, requests, renderInfo, VERSION, isOffline } from './globals.js'
+import { modules, root, views, requests, renderInfo, VERSION, isOffline, filepathPrefix } from './globals.js'
 
 marked.setOptions({
 	highlight(code, language){
@@ -69,7 +69,7 @@ function generateElements() {
 		}
 		const label = mod.source.split('/').at(-1)
 		return {
-			data: { id: mod.source, parent: compoundNodes ? parentNames[0] : undefined, label, baseLabel: label, href: `vscode://file${root}${mod.source}` },
+			data: { id: mod.source, parent: compoundNodes ? parentNames[0] : undefined, label, baseLabel: label, href: generateURL(root, mod.source) },
 			classes: parentNames[0] ? 'parent-' + parentNames[0] : undefined
 		}
 	})
@@ -130,7 +130,7 @@ for (const [id, { x, y }] of Object.entries(JSON.parse(localStorage.getItem('loc
 
 cy.on('dbltap', 'node', function () {
 	const url = this.data('href')
-	if (url) window.location.href = url
+	if (url) window.open(url, '_blank')
 });
 const locations = (() => {
 	const locs = JSON.parse(localStorage.getItem('locations') || '{}');
@@ -265,9 +265,9 @@ function renderWindow(id, { title, body }, ...buttons) {
 function generateEventNodes(event, forward) {
 	const nodes = [];
 
-	const urls = generateEventURLs(event)
-	const remaining = [...(event.type === 'view' ? [views.directory + '/' + generateViewName(event.name)] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse()];
-	if (!renderInfo.forward) remaining.reverse();
+	const urls = generateEventURLs(event, false)
+	const remaining = [...(event.type === 'view' ? [views.directory + '/' + generateViewName(event.name)] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.replace(filepathPrefix, '')).reverse()];
+	if (!forward) remaining.reverse();
 
 	while (remaining.length) {
 		const url = remaining.pop()
@@ -287,7 +287,7 @@ function generateEventTooltipContent(event, urls){
 	let content = document.createElement('div');
 
 	content.innerHTML = generateEventLabel(event);
-	content.innerHTML += '<br/>' + Object.entries(urls).filter(([_, url]) => url && !url.includes('node_modules') && !url.includes('express-handler-tracker')).reduce((lines, [name, url]) => [...lines, `<a href="${url}">${name[0].toUpperCase() + name.slice(1)}</a>`], []).join('<br/>')
+	content.innerHTML += '<br/>' + Object.entries(urls).filter(([_, url]) => url && !url.includes('node_modules') && !url.includes('express-handler-tracker')).reduce((lines, [name, url]) => [...lines, `<a target="_blank" href="${url}">${name[0].toUpperCase() + name.slice(1)}</a>`], []).join('<br/>')
 
 	return content;
 }
@@ -384,8 +384,7 @@ async function renderMiddleware() {
 		currentInAll.classList.add('highlighted-event');
 	}
 
-	const remainingNodes = generateEventNodes(event).reverse()
-	if (!renderInfo.forward) remainingNodes.reverse()
+	const remainingNodes = generateEventNodes(event, renderInfo.forward).reverse()
 
 	if (!remainingNodes.length) remainingNodes.push(renderInfo.lastNode)
 
@@ -578,8 +577,8 @@ function extractRanges(numbers) {
 }
 
 function renderRequestPath() {
-	cy.edges('.request-edge').removeClass('request-edge')
-	cy.nodes('.request-node').removeClass('request-node')
+	cy.edges('.request-edge').removeClass('request-edge').data('label', '').data('order', []);
+	cy.nodes('.request-node').removeClass('request-node').data('order', []).forEach(n => n.data('label', n.data('baseLabel') || n.data('label')));
 
 	const nodeIDs = [];
 	const nodeIndexes = [];
@@ -662,11 +661,11 @@ function renderRequest() {
 	const w6 = document.querySelector('#window6 pre')
 	w6.innerHTML = '';
 	let lastHTML = ''
-	for (const e of renderInfo.request.events) {
+	for (const [i, e] of renderInfo.request.events.entries()) {
 		let nextHTML = generateEventCodeHTML(e);
 		if (nextHTML === lastHTML || lastHTML.includes(nextHTML)) nextHTML = 'SAME'
 		if (nextHTML !== 'SAME') lastHTML = nextHTML
-		w6.innerHTML += `<details open data-event-id="${e.start}"><summary>${generateEventLabel(e)} <button>Render</button></summary>${nextHTML === 'SAME' ? 'Same as previous' : nextHTML}</details>`
+		w6.innerHTML += `<details open data-event-id="${e.start}"><summary>${generateEventLabel(e)} <button>Render</button></summary>${nextHTML === 'SAME' ? i ? 'Same as previous' : '' : nextHTML}</details>`
 	}
 	attachRenderListeners(w6)
 	renderRequestPath()
