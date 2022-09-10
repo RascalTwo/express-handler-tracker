@@ -65,7 +65,9 @@ export function generateProxyCallLabel(event, content = '.'.repeat(event.args.co
 	const suffix = event.attachedToLatestRequest ? '*' : '';
 	return event.property === 'constructor'
 		? `new ${event.label}(${content})${suffix}`
-		: `${event.label}.${event.property}(${content})${suffix}`;
+		: event.args.count === undefined
+			? `${event.label}.${event.property}${suffix}`
+			: `${event.label}.${event.property}(${content})${suffix}`;
 }
 
 export function generateEventLabel(event) {

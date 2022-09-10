@@ -427,7 +427,7 @@ typeof request === 'object' && request.__r2_proxies
 
 const stack = [];
 
-let paused = false;
+let paused = null;
 session.on('Debugger.resumed', () => paused = false)
 // Keep this callback as fast as possible, evaluateOnCallFrame can't be executed if the debugger unpauses which cannot be halted
 session.on('Debugger.paused', ({ params: { callFrames } }) => {
@@ -465,14 +465,14 @@ session.on('Debugger.paused', ({ params: { callFrames } }) => {
 const proxied = {};
 const proxyPromiseResults = new Map();
 
-module.exports.proxyInstrument = function (obj, label, { properties = [], callbackMethods = {} }) {
+module.exports.proxyInstrument = function (obj, label, { allProperties, properties = [], callbackMethods = {} } = {}) {
 	obj.__r2_source = getProjectLine();
 	obj.__r2_id = performance.now();
 	obj.__r2_label = label;
 
 	const makeHandler = (properties, callbackMethods) => ({
 		get(target, property, receiver) {
-			if (properties.length && !properties.includes(property) && !(property in callbackMethods)) {
+			if (!(allProperties || properties.includes(property) || property in callbackMethods)) {
 				return Reflect.get(target, property, receiver)
 			}
 
@@ -515,20 +515,24 @@ module.exports.proxyInstrument = function (obj, label, { properties = [], callba
 
 					const result = Reflect.apply(target, thisArgument, argumentsList);
 					if (typeof result !== 'object' || typeof result.then !== 'function') {
-						stack.unshift(Object.assign(info, { value: inspectToHTML(value), end: performance.now() }));
-						send('Debugger.pause');
+						if (paused !== null){
+							stack.unshift(Object.assign(info, { value: inspectToHTML(value), end: performance.now() }));
+							send('Debugger.pause');
+						}
 						return value;
 					}
 
-					stack.unshift(info);
-					send('Debugger.pause');
+					if (paused !== null){
+						stack.unshift(info);
+						send('Debugger.pause');
+					}
 					result.then = new Proxy(result.then, {
 						apply(target, thisArgument, [thenFunc, catchFunc]) {
 							return Reflect.apply(target, thisArgument, [value => {
-								proxyPromiseResults.set(start, { value: inspectToHTML(value), end: performance.now() })
+								if (paused !== null) proxyPromiseResults.set(start, { value: inspectToHTML(value), end: performance.now() })
 								return thenFunc(value)
 							}, reason => {
-								proxyPromiseResults.set(start, { reason: inspectToHTML(reason), end: performance.now() })
+								if (paused !== null) proxyPromiseResults.set(start, { reason: inspectToHTML(reason), end: performance.now() })
 								return catchFunc(reason);
 							}]);
 						}
@@ -536,7 +540,7 @@ module.exports.proxyInstrument = function (obj, label, { properties = [], callba
 					result.catch = new Proxy(result.then, {
 						apply(target, thisArgument, [catchFunc]) {
 							return Reflect.apply(target, thisArgument, [reason => {
-								proxyPromiseResults.set(start, { reason: inspectToHTML(reason), end: performance.now() })
+								if (paused !== null) proxyPromiseResults.set(start, { reason: inspectToHTML(reason), end: performance.now() })
 								return catchFunc(reason);
 							}]);
 						}
@@ -544,7 +548,7 @@ module.exports.proxyInstrument = function (obj, label, { properties = [], callba
 					return result;
 				}
 			})
-			else {
+			else if (paused !== null) {
 				stack.unshift({ start, property, id: obj.__r2_id, value: inspectToHTML(value), end: performance.now() });
 				send('Debugger.pause');
 			}
@@ -562,9 +566,10 @@ module.exports.proxyInstrument = function (obj, label, { properties = [], callba
 			}
 
 			const instance = new target(...args);
-
-			stack.unshift(Object.assign(info, { value: inspectToHTML(instance), end: performance.now() }));
-			send('Debugger.pause');
+			if (paused !== null) {
+				stack.unshift(Object.assign(info, { value: inspectToHTML(instance), end: performance.now() }));
+				send('Debugger.pause');
+			}
 
 			return instance;
 		}
@@ -587,6 +592,9 @@ module.exports.proxyInstrument = function (obj, label, { properties = [], callba
 
 if (require.main === module) require('./instrument')
 else {
-	send('Runtime.enable').then(() => send('Debugger.enable'));
+	send('Runtime.enable').then(() => {
+		paused = false;
+		send('Debugger.enable');
+	});
 	startSSE();
 }
