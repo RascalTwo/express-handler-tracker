@@ -37,6 +37,13 @@ document.querySelector('#eventNumbers').addEventListener('change', e => {
 	renderRequestPath()
 })
 
+
+let eventHighlights = document.querySelector('#eventHighlights').checked
+document.querySelector('#eventHighlights').addEventListener('change', e => {
+	eventHighlights = e.currentTarget.checked;
+	renderRequestPath()
+})
+
 setupEventSource(requests, () => {
 	if (!renderInfo.request) renderInfo.request = Object.values(requests)[0]
 	renderRequest()
@@ -596,6 +603,10 @@ function renderRequestPath() {
 		cy.nodes('*').not('.request-node').addClass('hidden')
 		cy.nodes('.request-node').removeClass('request-node');
 	}
+	if (!eventHighlights){
+		cy.nodes('.request-node').removeClass('request-node');
+		cy.edges('.request-edge').removeClass('request-edge');
+	}
 }
 function renderRequest() {
 	renderInfo.middlewareIndex = 0;
@@ -657,6 +668,41 @@ function updateRequestInfo(request, updates){
 	fetch('../update-request/' + request.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
 }
 
+function downloadBlob(blob, filename){
+	const url = URL.createObjectURL(blob);
+	const anchor = document.createElement('a');
+	anchor.style.display = 'none';
+	anchor.href = url;
+	anchor.download = filename;
+	document.body.appendChild(anchor);
+	anchor.click();
+	URL.revokeObjectURL(url);
+	anchor.remove();
+}
+
+document.querySelector('#save-as-png').addEventListener('click', () => {
+	window.open(cy.png({
+		bg: document.querySelector('#transparentBackground').checked
+			? 'transparent'
+			: document.querySelector('#darkTheme').checked
+				? '#41403e'
+				: 'white',
+		full: true
+	}), '_blank')
+});
+
+document.querySelector('#save-as-svg').addEventListener('click', () => {
+	const svgWindow = window.open("", 'SVG', '_blank')
+	svgWindow.document.body.innerHTML = cy.svg({
+		bg: document.querySelector('#transparentBackground').checked
+			? 'transparent'
+			: document.querySelector('#darkTheme').checked
+				? '#41403e'
+				: 'white',
+		full: true
+	})
+});
+
 (() => {
 	const checkbox = document.querySelector('#modal-1');
 	const modal = checkbox.nextElementSibling;
@@ -673,16 +719,7 @@ function updateRequestInfo(request, updates){
 
 
 	document.querySelector('#download-data').addEventListener('click', () => {
-		const blob = new Blob([JSON.stringify(serialize(getData(), { json: true }))], { type: 'application/json' });
-		const url = URL.createObjectURL(blob);
-		const anchor = document.createElement('a');
-		anchor.style.display = 'none';
-		anchor.href = url;
-		anchor.download = 'data.json';
-		document.body.appendChild(anchor);
-		anchor.click();
-		URL.revokeObjectURL(url);
-		anchor.remove();
+		downloadBlob(new Blob([JSON.stringify(serialize(getData(), { json: true }))], { type: 'application/json' }), 'data.json');
 	});
 
 	document.querySelector('#all-button').addEventListener('click', () => {

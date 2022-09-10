@@ -44,6 +44,7 @@
 		<link href="graph.css" rel="stylesheet" />
 		<script src="library/jsondiffpatch/jsondiffpatch.umd.js"></script>
 		<link rel="stylesheet" href="library/jsondiffpatch/html.css" type="text/css" />
+		<script src="library/cytoscape-svg.js"></script>
 	</head>
 
 	<body>
@@ -128,6 +129,15 @@
 										<div class="paper-switch-tile-card-front border">Light</div>
 										<div class="paper-switch-tile-card-back border background-primary">Dark</div>
 									</div>
+								</label>
+							</span>
+							<span class="form-group">
+								<label for="eventHighlights" class="paper-switch-label">
+									Request Highlights
+								</label>
+								<label class="paper-switch">
+									<input id="eventHighlights" name="eventHighlights" type="checkbox" checked />
+									<span class="paper-switch-slider"></span>
 								</label>
 							</span>
 						</div>
@@ -248,6 +258,20 @@
 					</datalist>
 					<button>Export</button>
 				</div>
+				<fieldset>
+					<legend>Images</legend>
+					<div class="form-group">
+						<label for="transparentBackground" class="paper-switch-label">
+							Transparent Background
+						</label>
+						<label class="paper-switch">
+							<input id="transparentBackground" name="transparentBackground" type="checkbox" checked />
+							<span class="paper-switch-slider"></span>
+						</label>
+					</div>
+					<button type="button" id="save-as-png">PNG</button>
+					<button type="button" id="save-as-svg">SVG</button>
+				</fieldset>
 			</div>
 		</form>
 

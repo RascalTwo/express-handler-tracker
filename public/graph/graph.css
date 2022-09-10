@@ -235,6 +235,7 @@ input[type="checkbox"]:not(:checked) + span {
 
 .modal-body {
 	max-height: 85vh;
+	overflow: scroll;
 }
 
 ul li::before {

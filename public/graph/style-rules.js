@@ -129,6 +129,8 @@ export function generateStylesheet(styleRules = parseStyleRules()) {
 			} catch (_) { }
 		}
 	})
+	const outline = dark ? 'white' : 'black';
+	const text = dark ? 'black' : 'white'
 	return [
 		{
 			selector: 'node',
@@ -137,7 +139,8 @@ export function generateStylesheet(styleRules = parseStyleRules()) {
 				'border-style': 'solid',
 				'border-width': '1',
 				'border-color': 'black',
-				"text-outline-color": "#fff",
+				color: text,
+				"text-outline-color": outline,
 				"text-outline-width": 1,
 				"text-wrap": "wrap",
 			}
@@ -145,7 +148,7 @@ export function generateStylesheet(styleRules = parseStyleRules()) {
 			"selector": ".group",
 			"style": {
 				"color": e => e.style('background-color'),
-				"text-outline-color": "#fff",
+				"text-outline-color": 'white',
 				"text-outline-width": 1,
 				'background-opacity': 0.25,
 			}
@@ -169,7 +172,7 @@ export function generateStylesheet(styleRules = parseStyleRules()) {
 				label: 'data(label)',
 				"edge-text-rotation": "autorotate",
 				"text-wrap": "wrap",
-				"text-outline-color": "#fff",
+				"text-outline-color": outline,
 				"text-outline-width": 1,
 				'font-size': '10'
 			}
@@ -194,7 +197,7 @@ export function generateStylesheet(styleRules = parseStyleRules()) {
 			"selector": '.' + className,
 			"style": {
 				"background-color": color || 'inherit',
-				shape: shape || 'inherit'
+				shape: shape || 'inherit',
 			}
 		}))]
 }
