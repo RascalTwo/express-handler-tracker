@@ -62,6 +62,10 @@ html.dark .background-primary {
 	height: 100%;
 }
 
+.window > div:first-of-type > span button {
+	padding: 0;
+}
+
 summary {
 	text-align: end;
 }

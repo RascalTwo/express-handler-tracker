@@ -10,6 +10,12 @@ import './theme.js';
 
 import { modules, root, views, requests, renderInfo, VERSION } from './globals.js'
 
+marked.setOptions({
+	highlight(code, language){
+		return hljs.highlight(code, { language }).value
+	}
+})
+
 let compoundNodes = document.querySelector('#groups').checked
 document.querySelector('#groups').addEventListener('change', e => {
 	compoundNodes = e.currentTarget.checked;
@@ -207,25 +213,16 @@ select.addEventListener('change', (e) => {
 	cy.layout(LAYOUTS[value]).run()
 })
 
-document.querySelectorAll('[id^="toggleButton"]').forEach(b => b.addEventListener('click', () => {
-	const window = b.closest('.window');
-	const body = JSON.parse(window.dataset.body)
-	body.type = body.type === 'textContent' ? 'innerHTML' : 'textContent'
-	window.dataset.body = JSON.stringify(body);
-	const title = JSON.parse(window.dataset.title)
-	title.type = title.type === 'textContent' ? 'innerHTML' : 'textContent'
-	window.dataset.title = JSON.stringify(title);
 
-	updateWindowHTML(window, body, title);
-}));
-
-function updateWindowHTML(window, body, title) {
+function updateWindowHTML(window, body, title, ...buttons) {
 	if (body !== undefined) {
 		const content = window.querySelector('.mainWindow')
 
 		if (body.type === 'diff') {
 			content.innerHTML = jsondiffpatch.formatters.html.format(body.data.delta, body.data.original)
 			jsondiffpatch.formatters.html.hideUnchanged();
+		} else if (body.type === 'markdown'){
+			content.innerHTML = marked.parse(body.string);
 		} else {
 			let pre = content.querySelector(':scope > pre');
 			if (!pre) {
@@ -240,19 +237,29 @@ function updateWindowHTML(window, body, title) {
 
 	}
 	if (title !== undefined) window.querySelector('.windowTitle')[title.type] = title.string;
+
+	const buttonContainer = window.children[0].querySelector('span');
+	buttonContainer.innerHTML = '';
+	for (const info of buttons){
+		const button = document.createElement('button')
+		for (const key in info){
+			button[key] = info[key]
+		}
+		buttonContainer.appendChild(button)
+	}
 }
 
 /**
  * @param {number} id
  * @param {Record<'content' | 'title', { type: 'textContent' | 'innerHTML' | 'code' | 'diff', string: 'string', data?: any } | string>} data
  */
-function renderWindow(id, { title, body }) {
+function renderWindow(id, { title, body }, ...buttons) {
 	if (typeof body === 'string') body = { type: 'innerHTML', string: body }
 	if (typeof title === 'string') title = { type: 'innerHTML', string: title }
 	const window = document.querySelector(`#window${id}`);
 	window.dataset.body = JSON.stringify(body);
 	window.dataset.title = JSON.stringify(title);
-	updateWindowHTML(window, body, title)
+	updateWindowHTML(window, body, title, ...buttons)
 }
 
 function generateEventNodes(event, forward) {
@@ -283,6 +290,21 @@ function generateEventTooltipContent(event, urls){
 	content.innerHTML += '<br/>' + Object.entries(urls).filter(([_, url]) => url && !url.includes('node_modules') && !url.includes('express-handler-tracker')).reduce((lines, [name, url]) => [...lines, `<a href="${url}">${name[0].toUpperCase() + name.slice(1)}</a>`], []).join('<br/>')
 
 	return content;
+}
+
+async function jumpToAnnotatedEvent(change){
+	let found = null;
+	for (let i = renderInfo.middlewareIndex + change; i >= 0 && i < renderInfo.request.events.length; i += change){
+		if (!renderInfo.request.events[i].annotation) continue;
+		found = i;
+		break;
+	}
+	if (found === null) return;
+	while (renderInfo.middlewareIndex !== found) {
+		renderInfo.middlewareIndex += change;
+		await renderMiddleware()
+		await new Promise(r => setTimeout(r, 100));
+	}
 }
 
 async function renderMiddleware() {
@@ -329,6 +351,22 @@ async function renderMiddleware() {
 		renderWindow(1, event.args?.string ? { title: 'Arguments', body: generateProxyCallLabel(event, event.args.string.slice(1, -1)) } : { body: '' })
 		renderWindow(2, { title: 'Result', body: event.reason || event.value });
 	}
+	renderWindow(7, {
+		title: 'Annotation',
+		body: { type: 'markdown', string: event.annotation || '' } },
+		{
+			innerHTML: 'Previous',
+			onclick: () => jumpToAnnotatedEvent(-1)
+		},
+		{
+			innerHTML: 'Edit',
+			onclick: () => openMarkdownModal(renderInfo.request.id, event.start, event.annotation || '# Markdown-Powered!')
+		},
+		{
+			innerHTML: 'Next',
+			onclick: () => jumpToAnnotatedEvent(1)
+		}
+	);
 
 	const urls = generateEventURLs(event)
 	const remaining = [...(event.type === 'view' ? [views.directory + '/' + generateViewName(event.name)] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse()];
@@ -352,6 +390,7 @@ async function renderMiddleware() {
 	if (!remainingNodes.length) remainingNodes.push(renderInfo.lastNode)
 
 	disableButtons()
+	await new Promise(r => setTimeout(r, 100));
 	while (remainingNodes.length) {
 		const target = remainingNodes.pop()
 
@@ -417,7 +456,7 @@ async function renderMiddleware() {
 		}
 		renderInfo.tip.show();
 	}
-	enableButtons()
+	setTimeout(() => enableButtons(), 100);
 }
 
 const requestSelect = document.querySelector('#requests');
@@ -614,6 +653,7 @@ function renderRequest() {
 	renderWindow(2, { body: '' })
 	renderWindow(5, { body: '' })
 	renderWindow(6, { body: '' })
+	renderWindow(7, { body: '' })
 	renderMiddleware();
 	renderBubbles()
 	renderMiddlewaresSelect()
@@ -668,6 +708,10 @@ function updateRequestInfo(request, updates){
 	fetch('../update-request/' + request.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
 }
 
+function updateAnnotation(requestId, eventStart, updates){
+	fetch('../update-event/' + requestId + '/' + eventStart, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+}
+
 function downloadBlob(blob, filename){
 	const url = URL.createObjectURL(blob);
 	const anchor = document.createElement('a');
@@ -702,6 +746,37 @@ document.querySelector('#save-as-svg').addEventListener('click', () => {
 		full: true
 	})
 });
+
+const openMarkdownModal = (() => {
+	const checkbox = document.querySelector('#modal-3');
+	const modal = checkbox.nextElementSibling;
+
+	let info = {};
+
+	const openMarkdownModal = (requestId, eventStart, initialText) => {
+		Object.assign(info, { requestId, eventStart })
+		modal.elements[0].value = initialText
+		checkbox.checked = true;
+		modal.elements[0].focus()
+	}
+
+	modal.addEventListener('submit', e => {
+		e.preventDefault()
+
+		const newAnnotation = modal.elements[0].value;
+		const event = requests[info.requestId].events.find(e => e.start === info.eventStart);
+		if (!newAnnotation) {
+			if (event.annotation === undefined) return
+			delete event.annotation
+		}
+		event.annotation = newAnnotation;
+		updateAnnotation(info.requestId, event.start, { annotation: newAnnotation });
+		renderMiddleware();
+		checkbox.checked = false;
+	})
+
+	return openMarkdownModal;
+})();
 
 (() => {
 	const checkbox = document.querySelector('#modal-1');

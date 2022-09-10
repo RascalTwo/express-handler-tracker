@@ -2,6 +2,7 @@ const path = require('path')
 const fs = require('fs')
 
 const express = require('express');
+const compression = require('compression')
 const cors = require('cors');
 const { cruise } = require("dependency-cruiser");
 
@@ -13,8 +14,12 @@ const serialize = require('./public/serialize');
 let cruiseModules;
 
 const server = express();
-server.use(compression())
+
 server.use(cors());
+
+server.get('/events', handleSSERequests)
+
+server.use(compression())
 server.use(express.static(path.join(__dirname, 'public')));
 
 server.get('/', function renderHomepage(request, response) {
@@ -54,8 +59,6 @@ server.get('/info', function sendDependencyInfo(_, response){
 	});
 });
 
-server.get('/events', handleSSERequests)
-
 
 server.get('/reset', (request, response) => {
 	REQUESTS.clear();
@@ -69,17 +72,43 @@ server.get('/requests', function sendRequests(_, response){
 server.get('/delete-request/:id', function deleteRequest(request, response){
 	const id = +request.params.id;
 	if (!id) return response.status(404).end();
-	if (!REQUESTS.has(id)) return response.status(400).end();
+
+	if (!REQUESTS.has(id)) return response.status(404).end();
 
 	REQUESTS.delete(id);
+
 	return response.status(200).end();
 })
 server.patch('/update-request/:id', express.json(), function updateRequest(request, response){
 	const id = +request.params.id;
 	if (!id) return response.status(404).end();
-	if (!REQUESTS.has(id)) return response.status(400).end();
 
-	Object.assign(REQUESTS.get(id), request.body);
+	const foundRequest = REQUESTS.get(id)
+	if (!foundRequest) return response.status(404).end();
+
+	for (const key of ['label']){
+		if (key in request.body) foundRequest[key] = request.body[key]
+		else delete foundRequest[key]
+	}
+	return response.status(200).end();
+})
+
+server.patch('/update-event/:requestId/:eventStart', express.json(), function updateRequest(request, response){
+	const requestId = +request.params.requestId;
+	if (!requestId) return response.status(404).end();
+
+	const foundRequest = REQUESTS.get(requestId)
+	if (!foundRequest) return response.status(404).end();
+
+	const eventStart = +request.params.eventStart;
+	const event = foundRequest.events.find(e => e.start === eventStart);
+	if (!event) return response.status(404).end();
+
+	for (const key of ['annotation']){
+		if (key in request.body) event[key] = request.body[key]
+		else delete event[key]
+	}
+
 	return response.status(200).end();
 })
 

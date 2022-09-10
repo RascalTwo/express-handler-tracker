@@ -45,6 +45,7 @@
 		<script src="library/jsondiffpatch/jsondiffpatch.umd.js"></script>
 		<link rel="stylesheet" href="library/jsondiffpatch/html.css" type="text/css" />
 		<script src="library/cytoscape-svg.js"></script>
+		<script src="https://cdnjs.cloudflare.com/ajax/libs/marked/4.1.0/marked.min.js" integrity="sha512-DZIC9m2IbFlio5GE2oKD6/veW6NXML5Cbo9FHnba7Q9R4OCPelWw9R5QpupcPPLSv0euhuRr+5JV5pWl3X3nSg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
 	</head>
 
 	<body>
@@ -53,7 +54,7 @@
 		<span id="tooltippy"></span>
 
 		<div class="windowGroup">
-			<div id="window1" class="window data black fade small">
+			<div id="window1" class="window black fade small">
 				<div class="purple">
 					<p class="windowTitle">Request</p>
 				</div>
@@ -62,7 +63,7 @@
 					<pre></pre>
 				</div>
 			</div>
-			<div id="window2" class="window data black fade small">
+			<div id="window2" class="window black fade small">
 				<div class="orange">
 					<p class="windowTitle">Response</p>
 				</div>
@@ -201,6 +202,15 @@
 					<pre></pre>
 				</div>
 			</div>
+			<div id="window7" class="window fade black small">
+				<div class="green">
+					<p class="windowTitle">Annotation</p>
+				</div>
+				<br /><br />
+				<div class="mainWindow">
+					<pre></pre>
+				</div>
+			</div>
 		</div>
 
 
@@ -209,6 +219,7 @@
 			<button id="button4">Events</button>
 			<button id="button1">Request</button>
 			<button id="button2">Response</button>
+			<button id="button7">Annotation</button>
 			<button id="button5">Current Code</button>
 			<button id="button6">All Code</button>
 			<span id="meter-wrapper">
@@ -288,6 +299,17 @@
 					<div class="form-group"><select id="import-data-select"></select></div>
 				</div>
 				<button>Import</button>
+			</div>
+		</form>
+
+		<input class="modal-state" id="modal-3" type="checkbox" autocomplete="off">
+		<form class="modal">
+			<label class="modal-bg" for="modal-3"></label>
+			<div class="modal-body">
+				<label class="btn-close" for="modal-3">X</label>
+				<h4 class="modal-title">Set Annotation Markdown</h4>
+				<textarea autocomplete="off"></textarea>
+				<button>Set</button>
 			</div>
 		</form>
 
