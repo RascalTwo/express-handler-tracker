@@ -13,6 +13,7 @@ const serialize = require('./public/serialize');
 let cruiseModules;
 
 const server = express();
+server.use(compression())
 server.use(cors());
 server.use(express.static(path.join(__dirname, 'public')));
 
