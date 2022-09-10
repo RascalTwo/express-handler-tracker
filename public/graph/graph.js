@@ -301,7 +301,8 @@ async function renderMiddleware() {
 				if (!delta) continue;
 
 				if (!original) original = deserialize(serialize(delta));
-				else jsondiffpatch.patch(original, deserialize(serialize(delta)))
+				else try { jsondiffpatch.patch(original, deserialize(serialize(delta)))}
+				catch(e) { console.error(e, original, delta, e) }
 			}
 			renderWindow(i + 1, { title: key[0].toUpperCase() + key.slice(1), body: {type: 'diff', data: { original, delta: event.diffs[key] } } });
 		}

@@ -235,10 +235,8 @@ const returnHandler = (method, handler) => args => {
 		for (const [key, obj] of [['request', request], ['response', response]]) {
 			try {
 				diffs[key] = jsondiffpatch.diff(originals[key], clone(obj))
-				if (diffs[key] === 'Compared values have no visual difference.' || diffs[key] === null) diffs[key] = undefined
-			} catch (e) {
-				diffs[key] = 'Unable to inspect'
-			}
+				if (!Object.keys(diffs[key] || {}).length) diffs[key] = undefined
+			} catch (e) {}
 		}
 
 		addRequestData(request, {
