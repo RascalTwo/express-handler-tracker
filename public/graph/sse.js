@@ -23,7 +23,7 @@ export function setupEventSource(requests, onUpdate) {
 				else requests[id].events.push(event);
 			}
 
-			requests[id].events.sort((a, b) => a.start - b.start || a.order - b.order);
+			requests[id].events.sort((a, b) => a.start - b.start);
 		}
 		onUpdate()
 	});

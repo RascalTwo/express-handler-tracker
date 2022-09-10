@@ -39,7 +39,7 @@ const startSSEPiping = async () => {
 			if (!info) continue;
 			if (!(chunk.id in newRequests)) newRequests[chunk.id] = { id: chunk.id, start: info.start, events: [] };
 			newRequests[chunk.id].events.push(chunk.event);
-			newRequests[chunk.id].events.sort((a, b) => a.start - b.start || a.order - b.order);
+			newRequests[chunk.id].events.sort((a, b) => a.start - b.start);
 		}
 
 		const json = JSON.stringify(serialize(newRequests, { json: true }));

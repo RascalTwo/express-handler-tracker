@@ -206,7 +206,7 @@ const returnHandler = (method, handler) => args => {
 			const info = REQUESTS.get(request.__r2_id)
 			if (info) {
 				let last;
-				for (const event of [...info.events.sort((a, b) => a.order - b.order)].reverse()) {
+				for (const event of [...info.events.sort((a, b) => a.start - b.start)].reverse()) {
 					if (event.type === 'middleware') {
 						if (event.handler?.name === handler.name) last = event;
 						break

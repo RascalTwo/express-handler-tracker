@@ -95,11 +95,10 @@ function addRequestData(request, data) {
 }
 
 function addInfo(info, data){
-	data.order = info.events.length;
 	const replacingIndex = info.events.findIndex(e => e.start === data.start);
 	if (replacingIndex !== -1) info.events.splice(replacingIndex, 1);
 	info.events.push(data);
-	info.events.sort((a, b) => a.start - b.start || a.order - b.order);
+	info.events.sort((a, b) => a.start - b.start);
 	if (!SSE.clients.length) return;
 	SSE.backflow.push({ id: info.id, event: data });
 }

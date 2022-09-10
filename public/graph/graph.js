@@ -331,7 +331,7 @@ async function renderMiddleware() {
 	w5.innerHTML = generateEventCodeHTML(event);
 	attachRenderListeners(w5)
 
-	const currentInAll = document.querySelector(`details[data-event-id="${event.start + '' + event.order}"]`)
+	const currentInAll = document.querySelector(`details[data-event-id="${event.start}"]`)
 	if (currentInAll) {
 		currentInAll.open = true;
 		currentInAll.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -498,7 +498,7 @@ function renderMiddlewaresSelect() {
 
 function attachRenderListeners(parent) {
 	document.querySelectorAll('details').forEach(d => d.querySelector('button').addEventListener('click', () =>
-		changeMiddleware(renderInfo.request.events.findIndex(e => e.start + '' + e.order === d.dataset.eventId))
+		changeMiddleware(renderInfo.request.events.findIndex(e => e.start == d.dataset.eventId))
 	))
 }
 
@@ -615,7 +615,7 @@ function renderRequest() {
 		let nextHTML = generateEventCodeHTML(e);
 		if (nextHTML === lastHTML || lastHTML.includes(nextHTML)) nextHTML = 'SAME'
 		if (nextHTML !== 'SAME') lastHTML = nextHTML
-		w6.innerHTML += `<details open data-event-id="${e.start + '' + e.order}"><summary>${generateEventLabel(e)} <button>Render</button></summary>${nextHTML === 'SAME' ? 'Same as previous' : nextHTML}</details>`
+		w6.innerHTML += `<details open data-event-id="${e.start}"><summary>${generateEventLabel(e)} <button>Render</button></summary>${nextHTML === 'SAME' ? 'Same as previous' : nextHTML}</details>`
 	}
 	attachRenderListeners(w6)
 	renderRequestPath()
