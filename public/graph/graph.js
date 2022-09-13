@@ -9,6 +9,7 @@ import { animationDuration } from './animation-duration.js';
 import './theme.js';
 
 import { modules, root, views, requests, renderInfo, VERSION, isOffline, filepathPrefix } from './globals.js'
+import { generateLinkedSVG } from './svg.js';
 
 marked.setOptions({
 	highlight(code, language){
@@ -913,16 +914,7 @@ document.querySelector('#save-as-png').addEventListener('click', () => {
 
 document.querySelector('#save-as-svg').addEventListener('click', () => {
 	const svgWindow = window.open("", 'SVG', '_blank')
-	console.log(cy.svg({
-		bg: document.querySelector('#transparentBackground').checked
-			? 'transparent'
-			: document.querySelector('#darkTheme').checked
-				? '#41403e'
-				: 'white',
-		full: true
-	}))
-	return
-	svgWindow.document.body.innerHTML = cy.svg({
+	const rawSVG = cy.svg({
 		bg: document.querySelector('#transparentBackground').checked
 			? 'transparent'
 			: document.querySelector('#darkTheme').checked
@@ -930,6 +922,15 @@ document.querySelector('#save-as-svg').addEventListener('click', () => {
 				: 'white',
 		full: true
 	})
+	svgWindow.document.body.innerHTML = rawSVG;
+	svgWindow.document.body.innerHTML = generateLinkedSVG(svgWindow.document.body.children[0], document.querySelector('#root-input').value || root);
+
+	const linkedSVG = svgWindow.document.body.innerHTML;
+
+	const downloadBtn = document.createElement('button');
+	downloadBtn.textContent = 'Download';
+	downloadBtn.addEventListener('click', () => downloadBlob(new Blob([linkedSVG], { type: 'image/svg+xml' }), 'graph.svg'))
+	svgWindow.document.body.appendChild(downloadBtn);
 });
 
 const openMarkdownModal = (() => {

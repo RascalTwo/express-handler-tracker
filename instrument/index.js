@@ -60,7 +60,6 @@ const getArgv = rawArgv => yargs(hideBin(rawArgv))
 	})
 	.command('instrument', 'Instrument code')
 	.command('deinstrument', 'Remove instrumentation from code')
-	.command('version', 'Get current version')
 	.strictCommands()
 	.strictOptions()
 	.argv
@@ -157,8 +156,7 @@ async function deinstrument() {
 	if (argv.package) spawnPipedCommand('npm', 'uninstall', 'https://github.com/RascalTwo/express-handler-tracker');
 }
 
-if (argv._[0] === 'version') console.log(process.env.npm_package_version);
-else if (argv._[0] === 'instrument') {
+if (argv._[0] === 'instrument') {
 	// If no port && no subRoute, prevent
 	const noServer = !argv.port && !argv.subRoute
 	if (noServer) console.error('Neither port or subRoute provided, instrumentation will not result in a running server')

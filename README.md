@@ -37,25 +37,26 @@ $ npm run start
 ## Table Of Contents
 
 - [Express Handler Tracker](#express-handler-tracker)
-  - [Quickstart](#quickstart)
-  - [Table Of Contents](#table-of-contents)
-  - [Installation](#installation)
-    - [Automatic Instrumentation](#automatic-instrumentation)
-    - [Manual Instrumentation](#manual-instrumentation)
-      - [Proxy Instrumentation](#proxy-instrumentation)
-  - [Troubleshooting](#troubleshooting)
-  - [Usage](#usage)
-    - [API](#api)
-    - [Website](#website)
-      - [Layouts](#layouts)
-        - [Export/Import](#exportimport)
-      - [Events](#events)
-      - [Request](#request)
-      - [Response](#response)
-      - [Annotation](#annotation)
-      - [Current Code](#current-code)
-      - [All Code](#all-code)
-  - [How it works](#how-it-works)
+	- [Quickstart](#quickstart)
+	- [Table Of Contents](#table-of-contents)
+	- [Installation](#installation)
+		- [Automatic Instrumentation](#automatic-instrumentation)
+		- [Manual Instrumentation](#manual-instrumentation)
+			- [Proxy Instrumentation](#proxy-instrumentation)
+	- [Troubleshooting](#troubleshooting)
+	- [Usage](#usage)
+		- [API](#api)
+		- [Website](#website)
+			- [Layouts](#layouts)
+				- [Export/Import](#exportimport)
+					- [SVG Generation](#svg-generation)
+			- [Events](#events)
+			- [Request](#request)
+			- [Response](#response)
+			- [Annotation](#annotation)
+			- [Current Code](#current-code)
+			- [All Code](#all-code)
+	- [How it works](#how-it-works)
 
 ## Installation
 
@@ -282,6 +283,12 @@ You can filter what data is exported - from window positions, node rendering inf
 Additionally you can modify the paths - root, views, and views extension - allowing you to prefix all URLs with a non-local resource, such as a GitHub repository.
 
 Finally you can also generate SVG/PNG images of the current layout.
+
+###### SVG Generation
+
+The generated SVGs additionally have all the nodes linked - based on the entered root.
+
+This can allow for staticly clickable versions of this to be hosted, and linked to from a GitHub repository README.md for example.
 
 #### Events
 
