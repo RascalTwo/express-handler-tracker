@@ -1,15 +1,15 @@
 const util = require('util');
 
 // Uninstrumented `const app = express()` variations, extract `const`, `app`, and `express()`
-const SERVER_UNINSTRUMENTED_REGEX = /(?<declarationKeyword>const|var|let)? ?(?<variable>.*?) ?= ?(?<value>require\((?<quote>'|"|`)express\4\)\(\)|express\(\));?/ig;
+const SERVER_UNINSTRUMENTED_REGEX = /(?<declarationKeyword>const|var|let)? ?(?<variable>.*?) ?= ?(?<value>require\((?<quote>'|"|`)express\4\)\(\)|express\(\))(?<semicolon>;)?/ig;
 
 // Instrumented `const app = require('@rascal_two/express-handler-tracker')(express(), )`, extract `const`, `app`, and `express()`
-const SERVER_INSTRUMENTED_REGEX = /(?<declarationKeyword>const|var|let)? ?(?<variable>.*?) ?= ?require\((?<quote>'|"|`).*?\4\)\((?<value>.*?),[\s\S]*?\);?/ig
+const SERVER_INSTRUMENTED_REGEX = /(?<declarationKeyword>const|var|let)? ?(?<variable>.*?) ?= ?require\((?<quote>'|"|`).*?\4\)\((?<value>.*?),[\s\S]*?\)(?<semicolon>;)?/ig
 // Detection of multiline instrumentation
 const MULTILINE_INSTRUMENTED_REGEX = /\/\/ Begin `express-handler-tracker` instrumentation[\s\S]*?\/\/ End `express-handler-tracker` instrumentation/ig
 
 // Parsing of multiline instrumentation, extract `const`, `app`, and `express()`
-const SERVER_MULTILINE_INSTRUMENTED_REGEX = /\/\/ Begin `express-handler-tracker` instrumentation\n.*?\n(?<declarationKeyword>const|var|let)? ?(?<variable>.*?) ?= ?(?<value>require\((?<quote>'|"|`)express\4\)\(\)|express\(\));?\n.*?\n.*?\n.*?\/\/ End `express-handler-tracker` instrumentation/ig
+const SERVER_MULTILINE_INSTRUMENTED_REGEX = /\/\/ Begin `express-handler-tracker` instrumentation\n.*?\n(?<declarationKeyword>const|var|let)? ?(?<variable>.*?) ?= ?(?<value>require\((?<quote>'|"|`)express\4\)\(\)|express\(\))(?<semicolon>;)?(?<wasConst> \/\/ const)?\n.*?\n.*?\n.*?\/\/ End `express-handler-tracker` instrumentation/ig
 
 
 module.exports = {
@@ -38,15 +38,15 @@ module.exports = {
 			}
 			// Don't perform instrumentation to already-instrumented multiline instrumentation
 			if (alreadyDone) continue
-			const { declarationKeyword, variable, value, quote = "'" } = match.groups;
+			const { declarationKeyword, variable, value, semicolon, quote = "'" } = match.groups;
 			let replacement = '';
 			if (argv.subRoute) {
 				replacement = [
 					'// Begin `express-handler-tracker` instrumentation',
-					`const instrumentor = require(${quote}@rascal_two/express-handler-tracker${quote});`,
-					`${!declarationKeyword || declarationKeyword === 'const' ? 'let' : declarationKeyword} ${variable} = ${value};`,
-					`${variable}.use(${quote}${argv.subRoute}${quote}, instrumentor.server);`,
-					`${variable} = instrumentor(${variable}${optionsString});`,
+					`const instrumentor = require(${quote}@rascal_two/express-handler-tracker${quote})${semicolon || ''}`,
+					`${!declarationKeyword || declarationKeyword === 'const' ? 'let' : declarationKeyword} ${variable} = ${value}${semicolon || ''}${declarationKeyword && declarationKeyword !== 'let' ? ' // ' + declarationKeyword : ''}`,
+					`${variable}.use(${quote}${argv.subRoute}${quote}, instrumentor.server)${semicolon || ''}`,
+					`${variable} = instrumentor(${variable}${optionsString})${semicolon || ''}`,
 					'// End `express-handler-tracker` instrumentation',
 				].join('\n')
 			} else {
@@ -61,11 +61,11 @@ module.exports = {
 		const replacements = [];
 
 		for (const match of [...content.matchAll(SERVER_INSTRUMENTED_REGEX), ...content.matchAll(SERVER_MULTILINE_INSTRUMENTED_REGEX)].reverse()) {
-			const { declarationKeyword, variable, value } = match.groups;
+			const { declarationKeyword, variable, value, semicolon, wasConst } = match.groups;
 			replacements.push({
 				start: match.index,
 				end: match.index + match[0].length,
-				replacement: `${declarationKeyword ? declarationKeyword + ' ' : ''}${variable} = ${value};`
+				replacement: `${wasConst ? 'const ' : declarationKeyword ? declarationKeyword + ' ' : ''}${variable} = ${value}${semicolon || ''}`
 			});
 		}
 
