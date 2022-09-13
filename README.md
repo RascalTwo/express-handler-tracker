@@ -1,5 +1,7 @@
 # Express Handler Tracker
 
+![GitHub package.json version](https://img.shields.io/github/package-json/v/RascalTwo/express-handler-tracker?style=for-the-badge)
+
 > This project is ongoing Active development, I do not recommend reliance on it until this message is no longer here
 
 Track the flow of requests through your application - then inspect them visually!
@@ -7,18 +9,20 @@ Track the flow of requests through your application - then inspect them visually
 ## Quickstart
 
 ```shell
-$ npx https://github.com/RascalTwo/express-handler-tracker@latest instrument --port=1338 --package
+$ npx https://github.com/RascalTwo/express-handler-tracker instrument --port=1338 --package
 > ...
 > Changes made
 $ npm run start
 > EHT available at http://localhost:1338/
 ```
 
+> Used the `npx` command with this before? You may not get the most updated version - run with the `--version` flag and ensure it matches the latest version - if not you should remove it from the local package via `npm remove @rascal_two/express-handler-tracker` and then run `npx clear-npx-cache`
+
 <details>
   <summary>Without NPX Usage</summary>
 
   ```shell
-  $ npm install https://github.com/RascalTwo/express-handler-tracker@latest
+  $ npm install https://github.com/RascalTwo/express-handler-tracker
   $ node node_modules/.bin/express-handler-tracker instrument --port=1338
   > ...
   > Changes made
@@ -30,26 +34,49 @@ $ npm run start
 
 > To use the latest possibly unstable features, add the `--replacers=all --attachAsyncProxiesToLatestRequest` flags to the instrument command.
 
+## Table Of Contents
+
+- [Express Handler Tracker](#express-handler-tracker)
+  - [Quickstart](#quickstart)
+  - [Table Of Contents](#table-of-contents)
+  - [Installation](#installation)
+    - [Automatic Instrumentation](#automatic-instrumentation)
+    - [Manual Instrumentation](#manual-instrumentation)
+      - [Proxy Instrumentation](#proxy-instrumentation)
+  - [Troubleshooting](#troubleshooting)
+  - [Usage](#usage)
+    - [API](#api)
+    - [Website](#website)
+      - [Layouts](#layouts)
+        - [Export/Import](#exportimport)
+      - [Events](#events)
+      - [Request](#request)
+      - [Response](#response)
+      - [Annotation](#annotation)
+      - [Current Code](#current-code)
+      - [All Code](#all-code)
+  - [How it works](#how-it-works)
+
 ## Installation
 
 After installing the package:
 
 ```shell
-npm install https://github.com/RascalTwo/express-handler-tracker@latest
+npm install https://github.com/RascalTwo/express-handler-tracker
 ```
 
 Your Express application & any routers must be instrumented, actual application instrumentation only requires a single configurable: the entry point of your application.
 
 This is the first file that dependency graphing should start from.
 
-> In addition, anything that exists within the request lifecycle can me [Proxy Instrumented](#express-handler-tracker).
+> In addition, anything that exists within the request lifecycle can be [Proxy Instrumented](#proxy-instrumentation).
 
 ### Automatic Instrumentation
 
 There exists a automatic-instrumentation & deinstrumentation script that will attempt to automate this process for you, it can be ran directly:
 
 ```shell
-npx https://github.com/RascalTwo/express-handler-tracker@latest
+npx https://github.com/RascalTwo/express-handler-tracker
 ```
 
 It has all the options that can be manually crafted:
@@ -83,7 +110,7 @@ Options:
 It will attempt to detect a valid JavaScript file in the current working directory to use as an `entryPoint`, meaning that from your project directory you only need to execute
 
 ```shell
-npx https://github.com/RascalTwo/express-handler-tracker@latest instrument
+npx https://github.com/RascalTwo/express-handler-tracker instrument
 ```
 
 and approve each of the changes to get started!
@@ -91,7 +118,7 @@ and approve each of the changes to get started!
 > To automatically reverse the process you can use the `deinstrument` subcommand:
 
 ```shell
-npx https://github.com/RascalTwo/express-handler-tracker@latest deinstrument
+npx https://github.com/RascalTwo/express-handler-tracker deinstrument
 ```
 
 ### Manual Instrumentation
@@ -166,13 +193,23 @@ Take Mongoose Models for example:
 // Before
 module.exports = mongoose.model('List', new mongoose.Schema({ ... }))
 /// After
-module.exports = require('@rascal_two/express-handler-tracker').proxyInstrument(mongoose.model('List', new mongoose.Schema({ ... })), 'List', ['find', 'updateOne', 'deleteOne']);
+module.exports = require('@rascal_two/express-handler-tracker').proxyInstrument(mongoose.model('List', new mongoose.Schema({ ... })), 'List', {
+  properties: ['find', 'updateOne', 'deleteOne']
+});
 ```
 
-The `proxyInstrument` method takes the object to be instrumented, the label of the object, and all properties of the object to be instrumented - if an empty array is passed, then every property will be instrumented.
+The `proxyInstrument` method takes the object to be instrumented, the label of the object, and various options on how and what to instrument of the passed in object.
 
-> Due to the limitations of Node.js to access asynchronous call stacks, interactions with proxied objects from within promise callbacks may not be accurately reported
-> Enabling `attachAsyncProxiesToLatestRequest` will make these attach to the latest request, which will be accurate until the server receives multiple requests at once.
+- `properties`
+  - Properties to inspect normally
+- `callbackMethods`
+  - Methods of object to inspect that should have callbacks additionally inspected
+  - Value is either the index of the callback in the argument list, or `true` to attempt to proxy all callback function arguments
+- `allProperties`
+  - Boolean to inspect all properties
+
+> Due to the limitations of Node.js to access asynchronous call stacks, interactions with proxied objects from within promises & callbacks may not be accurately reported
+> The `attachAsyncProxiesToLatestRequest` was added to make these usable by attaching them to the latest request, which will be accurate as long as the server receives requests sequentially.
 
 ## Troubleshooting
 
@@ -211,19 +248,44 @@ Each of these nodes can be clicked to open the file up in Visual Studio Code
 
 ***
 
-The bar at the bottom contains all the possible windows
+The bar at the bottom contains all the possible windows, of which all can be moved, resized and maximized/minimized.
 
 #### Layouts
 
-Settings for how the nodes are layed out on the page, from automatic placement algorithms, to use groups or bubble sets, displaying all or only current request edges, theming, and animation duration.
+Settings for how the nodes are layed out on the page and rendered.
+
+- Groups/Bubbles
+  - If to group directories into compound nodes or not.
+- Edges
+  - To show all edges or only edges for the current request
+- Event Numbers
+  - Mark nodes & edges of the current request sequentially
+- Nodes
+  - Display all nodes or just the ones of the current request
+- Theme
+  - Dark/Light Theme
+- Request Highlights
+  - Outline current request edges/nodes
+- Code Tooltips
+  - Show tooltip of code on every node for the current request
 
 Additionally there are style rules, which determine the color and shape of all nodes on the page.
 
 The pattern can be inputted any valid Regular Expression for nodes to match - this will be ran on the filename - in addition to the color and shape to make matching nodes.
 
-#### Requests
+##### Export/Import
 
-The Request inspector allows one to see all the requests that have come in, the events associated for each, and the ability to navigate through all of them one by one - which updates the contents of other windows appropriately.
+All data can be Exported & Imported to various formats - straight to the clipboard, downloaded as a `.json` file, or saved to local storage.
+
+You can filter what data is exported - from window positions, node rendering information, style rules, and each individual request.
+
+Additionally you can modify the paths - root, views, and views extension - allowing you to prefix all URLs with a non-local resource, such as a GitHub repository.
+
+Finally you can also generate SVG/PNG images of the current layout.
+
+#### Events
+
+The Events windows allows one to see all the requests that have come in, the events associated for each, and the ability to navigate through all of them one by one - which updates the contents of other windows appropriately.
 
 Events that have been indented with hyphens are detected as sub-events, for example events that occurred within a unique Express Router.
 
@@ -233,13 +295,29 @@ Events that have been indented with hyphens are detected as sub-events, for exam
 
 > The Event toast that appears within the graph contains all known links for the event in question - from where it was added to the application, where it was evaluated, router construction, etc - all clickable to open the file to that location in Visual Studio Code
 
-#### Request Inspector
+#### Request
 
 Shows the changes to the request due to the currently selected event.
 
-#### Response Inspector
+> Additionally shows other input-related data, such as proxied arguments
 
-Shows the changes to the request due to the currently selected event - additionally shows data passed to view rendering, sent data, and more output-related information.
+#### Response
+
+Shows the changes to the request due to the currently selected event - additionally shows data passed to view rendering, sent data, proxies return values.
+
+#### Annotation
+
+Shows and allows the user to edit the markdown-powered annotation for the current event.
+
+Additionally, by adding content within
+
+```markdown
+[//]: # (Start Annotation)
+
+[//]: # (End Annotation)
+```
+
+blocks, it will place this markdown in the tooltip for the event.
 
 #### Current Code
 
