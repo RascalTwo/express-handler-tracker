@@ -60,7 +60,7 @@ export function generateHighlightedCode(event, urls = generateEventURLs(event)){
 }
 
 export function generateEventCodeHTML(event, urls = generateEventURLs(event)) {
-	return generateHighlightedCode(event, urls).map(({ key, html }) => `${key[0].toUpperCase() + key.slice(1)} <a target="_blank" href="${urls[key]}">${urls[key].replace(filepathPrefix, '')}</a><br/><code>${html}</code>`).join('<br/>');
+	return generateHighlightedCode(event, urls).map(({ key, html }) => `${key[0].toUpperCase() + key.slice(1)} <a ${urls[key].includes('http') ? 'target="_blank"' : ''} href="${urls[key]}">${urls[key].replace(filepathPrefix, '')}</a><br/><code>${html}</code>`).join('<br/>');
 }
 
 export function generateProxyCallLabel(event, content = '.'.repeat(event.args.count)) {

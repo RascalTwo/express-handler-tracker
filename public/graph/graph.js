@@ -137,7 +137,10 @@ for (const [id, { x, y }] of Object.entries(JSON.parse(localStorage.getItem('loc
 
 cy.on('dbltap', 'node', function () {
 	const url = this.data('href')
-	if (url) window.open(url, '_blank')
+	if (!url) return;
+
+	if (url.includes('http')) window.open(url, '_blank');
+	else window.location.href = url;
 });
 const locations = (() => {
 	const locs = JSON.parse(localStorage.getItem('locations') || '{}');
@@ -330,7 +333,7 @@ function generateEventTooltipContent(event, urls){
 	let content = document.createElement('div');
 
 	content.innerHTML = generateEventLabel(event).replace(/\n/g, '<br/>');
-	content.innerHTML += '<br/>' + Object.entries(urls).filter(([_, url]) => url && !url.includes('node_modules') && !url.includes('express-handler-tracker')).reduce((lines, [name, url]) => [...lines, `<a target="_blank" href="${url}">${name[0].toUpperCase() + name.slice(1)}</a>`], []).join('<br/>')
+	content.innerHTML += '<br/>' + Object.entries(urls).filter(([_, url]) => url && !url.includes('node_modules') && !url.includes('express-handler-tracker')).reduce((lines, [name, url]) => [...lines, `<a ${url.includes('http') ? 'target="_blank"' : ''} href="${url}">${name[0].toUpperCase() + name.slice(1)}</a>`], []).join('<br/>')
 	if (event.annotation){
 		const annotationContent = event.annotation.split('[//]: # (Start Annotation)').at(1)?.split('[//]: # (End Annotation)')[0].trim()
 		if (annotationContent) {
@@ -910,6 +913,15 @@ document.querySelector('#save-as-png').addEventListener('click', () => {
 
 document.querySelector('#save-as-svg').addEventListener('click', () => {
 	const svgWindow = window.open("", 'SVG', '_blank')
+	console.log(cy.svg({
+		bg: document.querySelector('#transparentBackground').checked
+			? 'transparent'
+			: document.querySelector('#darkTheme').checked
+				? '#41403e'
+				: 'white',
+		full: true
+	}))
+	return
 	svgWindow.document.body.innerHTML = cy.svg({
 		bg: document.querySelector('#transparentBackground').checked
 			? 'transparent'
