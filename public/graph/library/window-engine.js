@@ -58,6 +58,7 @@ function dragElement(elmnt) {
     }
 
     function dragMouseDown(e) {
+        if (e.buttons === 2 || e.buttons === 4) return;
         if (!"ontouchstart" in document.documentElement) {
             e.preventDefault();
         }

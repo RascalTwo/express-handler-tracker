@@ -274,7 +274,35 @@ function renderWindow(id, { title, body }, ...buttons) {
 	const window = document.querySelector(`#window${id}`);
 	window.dataset.body = JSON.stringify(body);
 	window.dataset.title = JSON.stringify(title);
-	updateWindowHTML(window, body, title, ...buttons)
+	updateWindowHTML(window, body, title, {
+		innerHTML: '🗖',
+		onclick: () => maximizeMinimizeToggle(window)
+	}, ...buttons)
+}
+
+for (let i = 1; i <= 7; i++){
+	const window = document.querySelector('#window' + i);
+	updateWindowHTML(window, undefined, undefined, {
+		innerHTML: '🗖',
+		onclick: () => maximizeMinimizeToggle(window)
+	})
+}
+
+function maximizeMinimizeToggle(window){
+	if (window.dataset.maximized){
+		const { top, left, width, height } = JSON.parse(window.dataset.maximized);
+		window.style.top = top;
+		window.style.left = left;
+		window.style.width = width;
+		window.style.height = height;
+		delete window.dataset.maximized;
+	} else {
+		window.dataset.maximized = JSON.stringify({ top: window.style.top, left: window.style.left, width: window.style.width, height: window.style.height })
+		window.style.top = '1vh';
+		window.style.left = '1vw';
+		window.style.width = '98vw';
+		window.style.height = '93vh';
+	}
 }
 
 function generateEventNodes(event, forward) {
