@@ -119,4 +119,19 @@ server.patch('/update-event/:requestId/:eventStart', express.json(), function up
 	return response.status(200).end();
 })
 
+server.delete('/delete-event/:requestId/:eventStart', express.json(), function updateRequest(request, response){
+	const requestId = +request.params.requestId;
+	if (!requestId) return response.status(404).end();
+
+	const foundRequest = REQUESTS.get(requestId)
+	if (!foundRequest) return response.status(404).end();
+
+	const eventStart = +request.params.eventStart;
+	const eventIndex = foundRequest.events.findIndex(e => e.start === eventStart);
+	if (eventIndex === -1) return response.status(404).end();
+
+	foundRequest.events.splice(eventIndex, 1)
+	return response.status(200).end();
+})
+
 module.exports = server

@@ -46,8 +46,8 @@
 		<link rel="stylesheet" href="library/jsondiffpatch/html.css" type="text/css" />
 		<script src="library/cytoscape-svg.js"></script>
 		<script src="library/marked.min.js" integrity="sha512-DZIC9m2IbFlio5GE2oKD6/veW6NXML5Cbo9FHnba7Q9R4OCPelWw9R5QpupcPPLSv0euhuRr+5JV5pWl3X3nSg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-		<script src="library/jsoneditor.min.js" integrity="sha512-WuimD+3eJ3qkskeMQiQZesaYjwyBiTN2Xg2tI60IDp5jx402/u8lLZAqCgAei92NInz0Jn+xYqJKYCbxic4hIA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
-		<link rel="stylesheet" href="library/jsoneditor.css" integrity="sha512-NGELF6nbKCOKdzzfnY/DOKS5W25MVV5iZb92NK3fIwnKpL1OEUXibeepvzxAEgQtWgXGOzllOUpCybmenKDeRQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
+		<script src="library/jsoneditor.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+		<link rel="stylesheet" href="library/jsoneditor.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
 	</head>
 
 	<body>
@@ -108,7 +108,7 @@
 									Event Numbers
 								</label>
 								<label class="paper-switch">
-									<input id="eventNumbers" name="eventNumbers" type="checkbox" checked />
+									<input id="eventNumbers" name="eventNumbers" type="checkbox" />
 									<span class="paper-switch-slider"></span>
 								</label>
 							</span>
@@ -193,7 +193,7 @@
 						<div><select id="requests"></select><button id="delete-request">Delete</button></div>
 
 						<label id="event-small"></label>
-						<select id="events" multiple>Events</select>
+						<div><select id="events" multiple>Events</select><button id="delete-event">Delete</button></div>
 					</div>
 				</div>
 			</div>
@@ -232,7 +232,9 @@
 			<button id="button4">Events</button>
 			<button id="button1">Request</button>
 			<button id="button2">Response</button>
+			<button id="footer-prev-annotation">⏪</button>
 			<button id="button7">Annotation</button>
+			<button id="footer-next-annotation">⏩</button>
 			<button id="button5">Current Code</button>
 			<button id="button6">All Code</button>
 			<span id="meter-wrapper">

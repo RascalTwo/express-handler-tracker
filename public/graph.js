@@ -360,6 +360,9 @@ async function jumpToAnnotatedEvent(change){
 	}
 }
 
+document.querySelector('#footer-prev-annotation').addEventListener('click', () => jumpToAnnotatedEvent(-1))
+document.querySelector('#footer-next-annotation').addEventListener('click', () => jumpToAnnotatedEvent(1))
+
 const editJSONButton = (getJSON, submitJSON) => ({
 	innerHTML: 'Edit',
 	onclick: () => openJSONEditorModal(getJSON, submitJSON)
@@ -620,6 +623,17 @@ function deleteRequest(id){
 
 document.querySelector('#delete-request').addEventListener('click', () => {
 	if (renderInfo.request) deleteRequest(renderInfo.request.id);
+})
+
+document.querySelector('#delete-event').addEventListener('click', () => {
+	const request = renderInfo.request;
+	const event = request.events[renderInfo.middlewareIndex]
+	request.events.splice(renderInfo.middlewareIndex, 1)
+	renderInfo.middlewareIndex = Math.max(0, renderInfo.middlewareIndex - 1)
+	document.querySelector('#events').value = request.events[renderInfo.middlewareIndex].start
+	renderMiddlewaresSelect()
+	renderMiddleware()
+	fetch('./delete-event/' + request.id + '/' + event.start, { method: 'DELETE' }).catch(console.error);
 })
 
 
