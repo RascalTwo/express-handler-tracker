@@ -124,8 +124,8 @@ function clone(object) {
 	return cloneButIgnore(object, SETTINGS.diffExcludedProperties);
 }
 
-function inspectToHTML(obj){
-	return terminalCodesToHtml(util.inspect(obj, { colors: true, numericSeparator: true, depth: null, maxArrayLength: null, maxStringLength: null, breakLength: 40 }))
+function formattedInspect(obj){
+	return util.inspect(obj, { numericSeparator: true, depth: null, maxArrayLength: null, maxStringLength: null, breakLength: 40 })
 }
 
-module.exports = { delay, getProjectLine, getLinesFromFilepathWithLocation, normalizeEvent, getHandlerInfo, getEvaluateInfo, addRequestData, clone, addInfo, inspectToHTML, getRootDirectory }
+module.exports = { delay, getProjectLine, getLinesFromFilepathWithLocation, normalizeEvent, getHandlerInfo, getEvaluateInfo, addRequestData, clone, addInfo, formattedInspect, getRootDirectory, cloneButIgnore }

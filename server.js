@@ -88,8 +88,11 @@ server.patch('/update-request/:id', express.json(), function updateRequest(reque
 	if (!foundRequest) return response.status(404).end();
 
 	for (const key of ['label']){
-		if (key in request.body) foundRequest[key] = request.body[key]
-		else delete foundRequest[key]
+		if (key in request.body) {
+			const value = request.body[key]
+			if (value === undefined) delete foundRequest[key]
+			else foundRequest[key] = value
+		}
 	}
 	return response.status(200).end();
 })
@@ -105,9 +108,12 @@ server.patch('/update-event/:requestId/:eventStart', express.json(), function up
 	const event = foundRequest.events.find(e => e.start === eventStart);
 	if (!event) return response.status(404).end();
 
-	for (const key of ['annotation']){
-		if (key in request.body) event[key] = request.body[key]
-		else delete event[key]
+	for (const key of ['annotation', 'diffs', 'locals', 'body', 'json', 'args', 'reason', 'value']){
+		if (key in request.body) {
+			const value = request.body[key];
+			if (value === undefined) delete event[key];
+			else event[key] = value;
+		}
 	}
 
 	return response.status(200).end();

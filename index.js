@@ -11,7 +11,7 @@ const { MIDDLEWARE_WAIT_TIME } = require('./constants')
 
 const server = require('./server')
 const { startSSE } = require('./sse')
-const { getProjectLine, addRequestData, getLinesFromFilepathWithLocation, getEvaluateInfo, clone, getHandlerInfo, addInfo, inspectToHTML, getRootDirectory } = require('./helpers')
+const { getProjectLine, addRequestData, getLinesFromFilepathWithLocation, getEvaluateInfo, clone, getHandlerInfo, addInfo, formattedInspect, getRootDirectory, cloneButIgnore } = require('./helpers')
 
 function errorToInfo(error) {
 	if (!error) return undefined;
@@ -129,7 +129,7 @@ const returnHandler = (method, handler) => args => {
 					end: performance.now(),
 					type: 'send',
 					evaluate: getEvaluateInfo(),
-					body: typeof body === 'object' ? inspectToHTML(bodyCopy) : bodyCopy,
+					body: bodyCopy,
 					contentType
 				});
 			}
@@ -145,7 +145,7 @@ const returnHandler = (method, handler) => args => {
 					end: performance.now(),
 					type: 'json',
 					evaluate: getEvaluateInfo(),
-					body: inspectToHTML(body),
+					json: cloneButIgnore(body, []),
 				});
 			}
 			return original;
@@ -484,7 +484,7 @@ module.exports.proxyInstrument = function (obj, label, { allProperties, properti
 						start,
 						property,
 						id: obj.__r2_id,
-						argv: inspectToHTML(argumentsList),
+						argv: formattedInspect(argumentsList),
 						argc: argumentsList.length
 					}
 					if (property in callbackMethods){
@@ -506,7 +506,7 @@ module.exports.proxyInstrument = function (obj, label, { allProperties, properti
 						for (const i of indexes){
 							argumentsList[i] = new Proxy(argumentsList[i], {
 								apply(target, thisArgument, argumentsList){
-									proxyPromiseResults.set(start, { value: inspectToHTML(argumentsList), end: performance.now() })
+									proxyPromiseResults.set(start, { value: formattedInspect(argumentsList), end: performance.now() })
 									return Reflect.apply(target, thisArgument, argumentsList);
 								}
 							})
@@ -516,7 +516,7 @@ module.exports.proxyInstrument = function (obj, label, { allProperties, properti
 					const result = Reflect.apply(target, thisArgument, argumentsList);
 					if (typeof result !== 'object' || typeof result.then !== 'function') {
 						if (paused !== null){
-							stack.unshift(Object.assign(info, { value: inspectToHTML(value), end: performance.now() }));
+							stack.unshift(Object.assign(info, { value: formattedInspect(value), end: performance.now() }));
 							send('Debugger.pause');
 						}
 						return value;
@@ -529,10 +529,10 @@ module.exports.proxyInstrument = function (obj, label, { allProperties, properti
 					result.then = new Proxy(result.then, {
 						apply(target, thisArgument, [thenFunc, catchFunc]) {
 							return Reflect.apply(target, thisArgument, [value => {
-								if (paused !== null) proxyPromiseResults.set(start, { value: inspectToHTML(value), end: performance.now() })
+								if (paused !== null) proxyPromiseResults.set(start, { value: formattedInspect(value), end: performance.now() })
 								return thenFunc(value)
 							}, reason => {
-								if (paused !== null) proxyPromiseResults.set(start, { reason: inspectToHTML(reason), end: performance.now() })
+								if (paused !== null) proxyPromiseResults.set(start, { reason: formattedInspect(reason), end: performance.now() })
 								return catchFunc(reason);
 							}]);
 						}
@@ -540,7 +540,7 @@ module.exports.proxyInstrument = function (obj, label, { allProperties, properti
 					result.catch = new Proxy(result.then, {
 						apply(target, thisArgument, [catchFunc]) {
 							return Reflect.apply(target, thisArgument, [reason => {
-								if (paused !== null) proxyPromiseResults.set(start, { reason: inspectToHTML(reason), end: performance.now() })
+								if (paused !== null) proxyPromiseResults.set(start, { reason: formattedInspect(reason), end: performance.now() })
 								return catchFunc(reason);
 							}]);
 						}
@@ -549,7 +549,7 @@ module.exports.proxyInstrument = function (obj, label, { allProperties, properti
 				}
 			})
 			else if (paused !== null) {
-				stack.unshift({ start, property, id: obj.__r2_id, value: inspectToHTML(value), end: performance.now() });
+				stack.unshift({ start, property, id: obj.__r2_id, value: formattedInspect(value), end: performance.now() });
 				send('Debugger.pause');
 			}
 			return value;
@@ -561,13 +561,13 @@ module.exports.proxyInstrument = function (obj, label, { allProperties, properti
 				start: performance.now(),
 				property: 'constructor',
 				id: obj.__r2_id,
-				argv: inspectToHTML(args),
+				argv: formattedInspect(args),
 				argc: args.length
 			}
 
 			const instance = new target(...args);
 			if (paused !== null) {
-				stack.unshift(Object.assign(info, { value: inspectToHTML(instance), end: performance.now() }));
+				stack.unshift(Object.assign(info, { value: formattedInspect(instance), end: performance.now() }));
 				send('Debugger.pause');
 			}
 

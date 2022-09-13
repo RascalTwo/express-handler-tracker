@@ -1,7 +1,7 @@
 let fails = 1;
 const connectionIndicator = document.querySelector('#connection-indicator');
 export function setupEventSource(requests, onUpdate) {
-	const es = new EventSource('../events');
+	const es = new EventSource('./events');
 	connectionIndicator.dataset.readyState = es.readyState
 	es.addEventListener('open', () => {
 		connectionIndicator.dataset.readyState = es.readyState

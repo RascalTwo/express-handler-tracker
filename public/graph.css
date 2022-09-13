@@ -1,6 +1,6 @@
 @font-face {
 	font-family: 'Bitstream Vera Sans Mono';
-	src: url(../VeraMono.ttf);
+	src: url(./VeraMono.ttf);
 }
 
 html,
@@ -282,4 +282,17 @@ ul li::before {
 
 meter, progress {
 	width: 5vw;
+}
+
+#jsoneditor {
+	height: 50vh;
+}
+
+#modal-4 + .modal .modal-body {
+	width: 75vw;
+}
+
+#modal-3 + .modal textarea {
+	min-width: 50vw;
+	min-height: 50vh;
 }

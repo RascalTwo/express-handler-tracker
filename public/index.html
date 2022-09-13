@@ -46,6 +46,8 @@
 		<link rel="stylesheet" href="library/jsondiffpatch/html.css" type="text/css" />
 		<script src="library/cytoscape-svg.js"></script>
 		<script src="library/marked.min.js" integrity="sha512-DZIC9m2IbFlio5GE2oKD6/veW6NXML5Cbo9FHnba7Q9R4OCPelWw9R5QpupcPPLSv0euhuRr+5JV5pWl3X3nSg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+		<script src="library/jsoneditor.min.js" integrity="sha512-WuimD+3eJ3qkskeMQiQZesaYjwyBiTN2Xg2tI60IDp5jx402/u8lLZAqCgAei92NInz0Jn+xYqJKYCbxic4hIA==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+		<link rel="stylesheet" href="library/jsoneditor.css" integrity="sha512-NGELF6nbKCOKdzzfnY/DOKS5W25MVV5iZb92NK3fIwnKpL1OEUXibeepvzxAEgQtWgXGOzllOUpCybmenKDeRQ==" crossorigin="anonymous" referrerpolicy="no-referrer" />
 	</head>
 
 	<body>
@@ -148,7 +150,7 @@
 									Code Tooltips
 								</label>
 								<label class="paper-switch">
-									<input id="codeTooltips" name="codeTooltips" type="checkbox" checked />
+									<input id="codeTooltips" name="codeTooltips" type="checkbox" />
 									<span class="paper-switch-slider"></span>
 								</label>
 							</span>
@@ -332,6 +334,17 @@
 				<h4 class="modal-title">Set Annotation Markdown</h4>
 				<textarea autocomplete="off"></textarea>
 				<button>Set</button>
+			</div>
+		</form>
+
+		<input class="modal-state" id="modal-4" type="checkbox" autocomplete="off">
+		<form class="modal">
+			<label class="modal-bg" for="modal-4"></label>
+			<div class="modal-body">
+				<label class="btn-close" for="modal-4">X</label>
+				<h4 class="modal-title">Update JSON</h4>
+				<div id="jsoneditor"></div>
+				<button>Update</button>
 			</div>
 		</form>
 

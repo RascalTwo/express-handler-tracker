@@ -281,7 +281,7 @@ function renderWindow(id, { title, body }, ...buttons) {
 	updateWindowHTML(window, body, title, {
 		innerHTML: '🗖',
 		onclick: () => maximizeMinimizeToggle(window)
-	}, ...buttons)
+	}, ...buttons.filter(Boolean))
 }
 
 for (let i = 1; i <= 7; i++){
@@ -360,6 +360,11 @@ async function jumpToAnnotatedEvent(change){
 	}
 }
 
+const editJSONButton = (getJSON, submitJSON) => ({
+	innerHTML: 'Edit',
+	onclick: () => openJSONEditorModal(getJSON, submitJSON)
+})
+
 async function renderMiddleware() {
 	if (!renderInfo.request) return
 	document.querySelector('#events').value = renderInfo.middlewareIndex;
@@ -386,34 +391,100 @@ async function renderMiddleware() {
 				else try { jsondiffpatch.patch(original, deserialize(serialize(delta)))}
 				catch(e) { console.error(e, original, delta, e) }
 			}
-			renderWindow(i + 1, { title: key[0].toUpperCase() + key.slice(1), body: {type: 'diff', data: { original, delta: event.diffs[key] } } });
+			renderWindow(
+				i + 1,
+				{ title: key[0].toUpperCase() + key.slice(1), body: { type: 'diff', data: { original, delta: event.diffs[key] } } },
+				editJSONButton(() => event.diffs[key], (_, newJSON) => {
+					event.diffs[key] = newJSON
+					renderMiddleware();
+					updateEvent(renderInfo.request.id, event.start, { diffs: event.diffs })
+				})
+			);
 		}
 	} else if (event.type === 'redirect') {
 		renderWindow(1, { body: '' })
 		renderWindow(2, { title: 'Redirected', body: event.path })
 	} else if (event.type === 'view') {
 		renderWindow(1, { body: '' })
-		renderWindow(2, { title: event.name + ' view', body: { type: 'code', string: event.locals ? JSON.stringify(event.locals, undefined, '  ') : '{}' } });
+		renderWindow(
+			2,
+			{ title: event.name + ' view', body: { type: 'code', string: event.locals ? JSON.stringify(event.locals, undefined, '  ') : '{}' } },
+			editJSONButton(() => event.locals, (_, newLocals) => {
+				event.locals = newLocals;
+				renderMiddleware()
+				updateEvent(renderInfo.request.id, event.start, { locals: event.locals })
+			})
+		);
 	} else if (event.type === 'send') {
 		renderWindow(1, { body: '' })
-		renderWindow(2, { title: 'Response Body', body: { type: 'code', string: event.body } });
+		renderWindow(
+			2,
+			{ title: 'Response Body', body: { type: 'code', string: event.body } },
+			{
+				innerHTML: 'Edit',
+				onclick: () => openTextModal(() => event.body || '', (_, newBody) => {
+					event.body = newBody;
+					renderMiddleware();
+					updateEvent(renderInfo.request.id, event.start, { body: event.body })
+				}, 'Set Body', 'Set')
+			}
+		);
 	} else if (event.type === 'json') {
 		renderWindow(1, { body: '' })
-		renderWindow(2, { title: 'Response JSON', body: event.body });
+		renderWindow(
+			2,
+			{ title: 'Response JSON', body: { type: 'code', string: JSON.stringify(event.json, undefined, '  ') } },
+			editJSONButton(() => event.json, (_, newJSON) => {
+				event.json = newJSON
+				renderMiddleware()
+				updateEvent(renderInfo.request.id, event.start, { json: event.json })
+			})
+		);
 	} else if (event.type === 'proxy-evaluate') {
-		renderWindow(1, event.args?.string ? { title: 'Arguments', body: generateProxyCallLabel(event, event.args.string.slice(1, -1)) } : { body: '' })
-		renderWindow(2, { title: 'Result', body: event.reason || event.value || '' });
+		if (event.args?.string) renderWindow(1, { title: 'Arguments', body: { type: 'code', string: generateProxyCallLabel(event, event.args.string.slice(1, -1)) } },
+		{
+			innerHTML: 'Edit',
+			onclick: () => openTextModal(() => event.args.string.slice(1, -1), (_, newArgsString) => {
+				event.args.string = '[' + newArgsString + ']'
+				renderMiddleware();
+				updateEvent(renderInfo.request.id, event.start, { args: event.args })
+			}, 'Set Arguments', 'Set')
+		})
+		else renderWindow(1, { body: '' })
+		renderWindow(
+			2,
+			{ title: 'Result', body: { type: 'code', string: event.reason || event.value || '' } },
+			event.reason || event.value ? {
+				innerHTML: 'Edit',
+				onclick: () => openTextModal(() => event.reason || event.value, (_, newThing) => {
+					if (event.reason) event.reason = newThing;
+					else event.value = newThing;
+					updateEvent(renderInfo.request.id, event.start, { reason: event.reason, value: event.value })
+					renderMiddleware();
+				}, 'Set Result', 'Set')
+			} : undefined
+		);
 	}
 	renderWindow(7, {
 		title: 'Annotation',
-		body: { type: 'markdown', string: event.annotation || '' } },
+		body: { type: 'markdown', string: event.annotation || '' }
+	},
 		{
 			innerHTML: 'Previous',
 			onclick: () => jumpToAnnotatedEvent(-1)
 		},
 		{
 			innerHTML: 'Edit',
-			onclick: () => openMarkdownModal(renderInfo.request.id, event.start, event.annotation || '# Markdown-Powered!')
+			onclick: () => openTextModal(() => event.annotation || '# Markdown-Powered!', (_, newAnnotation) => {
+				if (!newAnnotation) {
+					if (event.annotation === undefined) return
+					delete event.annotation
+				} else {
+					event.annotation = newAnnotation;
+				}
+				renderMiddleware();
+				updateEvent(renderInfo.request.id, event.start, { annotation: newAnnotation });
+			}, 'Set Annotation Markdown', 'Set')
 		},
 		{
 			innerHTML: 'Next',
@@ -544,7 +615,7 @@ function deleteRequest(id){
 	renderMiddlewaresSelect()
 	renderRequest()
 	renderMiddleware()
-	fetch('../delete-request/' + request.id).catch(console.error);
+	fetch('./delete-request/' + request.id).catch(console.error);
 }
 
 document.querySelector('#delete-request').addEventListener('click', () => {
@@ -882,11 +953,11 @@ window.addEventListener('keydown', ({ target, key }) => {
 });
 
 function updateRequestInfo(request, updates){
-	fetch('../update-request/' + request.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+	fetch('./update-request/' + request.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
 }
 
-function updateAnnotation(requestId, eventStart, updates){
-	fetch('../update-event/' + requestId + '/' + eventStart, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+function updateEvent(requestId, eventStart, updates) {
+	fetch('./update-event/' + requestId + '/' + eventStart, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
 }
 
 function downloadBlob(blob, filename){
@@ -933,15 +1004,17 @@ document.querySelector('#save-as-svg').addEventListener('click', () => {
 	svgWindow.document.body.appendChild(downloadBtn);
 });
 
-const openMarkdownModal = (() => {
+const openTextModal = (() => {
 	const checkbox = document.querySelector('#modal-3');
 	const modal = checkbox.nextElementSibling;
 
-	let info = {};
+	const info = {};
 
-	const openMarkdownModal = (requestId, eventStart, initialText) => {
-		Object.assign(info, { requestId, eventStart })
-		modal.elements[0].value = initialText
+	const openTextModal = (getText, submitText, title, button) => {
+		Object.assign(info, { getText, submitText })
+		modal.elements[0].value = getText()
+		modal.querySelector('.modal-title').textContent = title;
+		modal.querySelector('button').textContent = button;
 		checkbox.checked = true;
 		modal.elements[0].focus()
 	}
@@ -949,19 +1022,37 @@ const openMarkdownModal = (() => {
 	modal.addEventListener('submit', e => {
 		e.preventDefault()
 
-		const newAnnotation = modal.elements[0].value;
-		const event = requests[info.requestId].events.find(e => e.start === info.eventStart);
-		if (!newAnnotation) {
-			if (event.annotation === undefined) return
-			delete event.annotation
-		}
-		event.annotation = newAnnotation;
-		updateAnnotation(info.requestId, event.start, { annotation: newAnnotation });
-		renderMiddleware();
+		info.submitText(info.getText(), modal.elements[0].value)
 		checkbox.checked = false;
 	})
 
-	return openMarkdownModal;
+	return openTextModal;
+})();
+
+const openJSONEditorModal = (() => {
+	const checkbox = document.querySelector('#modal-4');
+	const modal = checkbox.nextElementSibling;
+
+	const editor = new JSONEditor(modal.querySelector('#jsoneditor'), {
+		mode: 'code'
+	});
+
+	const info = {};
+
+	const openJSONEditorModal = (getInitialJSON, submitJSON) => {
+		Object.assign(info, { getInitialJSON, submitJSON })
+		editor.set(getInitialJSON())
+		checkbox.checked = true;
+	}
+
+	modal.addEventListener('submit', e => {
+		e.preventDefault()
+
+		info.submitJSON(info.getInitialJSON(), editor.get());
+		checkbox.checked = false;
+	})
+
+	return openJSONEditorModal;
 })();
 
 (() => {
