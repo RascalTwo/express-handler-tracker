@@ -968,7 +968,19 @@ const openMarkdownModal = (() => {
 			zoom: cy.zoom(),
 			pan: cy.pan()
 		}
-		if (modal.querySelector('#layout-style-rules').checked) data.styleRules = JSON.parse(localStorage.getItem('style-rules') || '{}');
+		if (modal.querySelector('#layout-style-rules').checked) {
+			data.styleRules = JSON.parse(localStorage.getItem('style-rules') || '{}');
+			data.layoutValues = {
+				'layout-options': document.querySelector('#layout-options').value,
+				'animation-duration': document.querySelector('#animation-duration').value,
+				allEdges: document.querySelector('#allEdges').checked,
+				eventNumbers: document.querySelector('#eventNumbers').checked,
+				allNodes: document.querySelector('#allNodes').checked,
+				darkTheme: document.querySelector('#darkTheme').checked,
+				eventHighlights: document.querySelector('#eventHighlights').checked,
+				codeTooltips: document.querySelector('#codeTooltips').checked,
+			}
+		}
 		const selectedRequests = Object.fromEntries([...modal.querySelectorAll('ul input[type="checkbox"]:checked')].map(checkbox => {
 			const id = checkbox.id.split('-')[0];
 			return [id, requests[id]];
@@ -1057,7 +1069,7 @@ const openMarkdownModal = (() => {
 		if (inputs[1].value) text = inputs[1].value;
 		if (inputs[2].value) text = localStorage.getItem('saved-requests-' + localName);
 
-		const { windows, graph, styleRules, requests: newRequests, paths, VERSION } = deserialize(JSON.parse(text))
+		const { windows, graph, styleRules, layoutValues, requests: newRequests, paths, VERSION } = deserialize(JSON.parse(text))
 		if (windows) {
 			for (let i = 0; i < windows.length; i++) {
 				localStorage.setItem('window' + (i + 1) + '-style', windows[i])
@@ -1090,6 +1102,16 @@ const openMarkdownModal = (() => {
 		}
 		if (styleRules) {
 			localStorage.setItem('style-rules', JSON.stringify(styleRules))
+		}
+		if (layoutValues){
+			document.querySelector('#layout-options').value = layoutValues['layout-options'];
+			document.querySelector('#animation-duration').value = layoutValues['animation-duration'];
+			document.querySelector('#allEdges').checked = layoutValues.allEdges;
+			document.querySelector('#eventNumbers').checked = layoutValues.eventNumbers;
+			document.querySelector('#allNodes').checked = layoutValues.allNodes;
+			document.querySelector('#darkTheme').checked = layoutValues.darkTheme;
+			document.querySelector('#eventHighlights').checked = layoutValues.eventHighlights;
+			document.querySelector('#codeTooltips').checked = layoutValues.codeTooltips;
 		}
 		localStorage.setItem('importing-info', JSON.stringify({
 			...paths,
