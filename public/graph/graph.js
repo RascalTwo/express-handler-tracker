@@ -301,7 +301,7 @@ function generateEventNodes(event, forward) {
 function generateEventTooltipContent(event, urls){
 	let content = document.createElement('div');
 
-	content.innerHTML = generateEventLabel(event);
+	content.innerHTML = generateEventLabel(event).replace(/\n/g, '<br/>');
 	content.innerHTML += '<br/>' + Object.entries(urls).filter(([_, url]) => url && !url.includes('node_modules') && !url.includes('express-handler-tracker')).reduce((lines, [name, url]) => [...lines, `<a target="_blank" href="${url}">${name[0].toUpperCase() + name.slice(1)}</a>`], []).join('<br/>')
 	if (event.annotation){
 		const annotationContent = event.annotation.split('[//]: # (Start Annotation)').at(1)?.split('[//]: # (End Annotation)')[0].trim()

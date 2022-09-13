@@ -88,7 +88,7 @@ export function generateEventLabel(event) {
 	else if (event.type === 'proxy-evaluate') label = generateProxyCallLabel(event);
 	if (event.end && event.start) label += ' - ' + (event.end - event.start).toFixed(2) + 'ms';
 
-	if (event.type === 'start') label = `Started`
+	if (event.type === 'start') label = `Started\n`
 	if (event.type === 'finish') label = `Finished in ${(event.end - renderInfo.request.id).toFixed(2)} ms`
 
 	return label
