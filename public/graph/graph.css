@@ -258,3 +258,24 @@ ul li::before {
   font-family: 'Bitstream Vera Sans Mono', 'DejaVu Sans Mono', Monaco, Courier, monospace !important;
   font-size: 20px !important;
 }
+
+.tippy-content pre {
+	height: 25vh;
+	max-height: max-content;
+	overflow: scroll;
+	resize: both;
+}
+
+.close-tippy {
+	padding: 0;
+	position: absolute;
+	bottom: 0;
+	right: 0;
+}
+
+.cycle-placement {
+	padding: 0;
+	position: absolute;
+	bottom: 0;
+	right: 1.5rem;
+}

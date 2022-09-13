@@ -39,9 +39,7 @@ export function generateEventURLs(event, lineNumber = true) {
 	}
 }
 
-export function generateEventCodeHTML(event) {
-	const urls = generateEventURLs(event)
-
+export function generateHighlightedCode(event, urls = generateEventURLs(event)){
 	const codes = Object.fromEntries(Object.entries({
 		added: event.handler?.code?.add,
 		evaluated: event.evaluate?.code,
@@ -58,7 +56,11 @@ export function generateEventCodeHTML(event) {
 		});
 	}
 
-	return allLines.map(({ key, html }) => `${key[0].toUpperCase() + key.slice(1)} <a target="_blank" href="${urls[key]}">${urls[key].replace(filepathPrefix, '')}</a><br/><code>${html}</code>`).join('<br/>');
+	return allLines
+}
+
+export function generateEventCodeHTML(event, urls = generateEventURLs(event)) {
+	return generateHighlightedCode(event, urls).map(({ key, html }) => `${key[0].toUpperCase() + key.slice(1)} <a target="_blank" href="${urls[key]}">${urls[key].replace(filepathPrefix, '')}</a><br/><code>${html}</code>`).join('<br/>');
 }
 
 export function generateProxyCallLabel(event, content = '.'.repeat(event.args.count)) {
