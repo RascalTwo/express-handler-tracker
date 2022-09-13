@@ -1,7 +1,7 @@
 import { LAYOUTS } from './constants.js'
 
 import { generateStylesheet, renderStyleRules, updateStyles } from './style-rules.js'
-import { sourceLineToID, generateViewName, generateEventURLs, generateEventCodeHTML, generateEventLabel, generateProxyCallLabel, generateURL } from './helpers.js'
+import { sourceLineToID, generateViewName, generateEventURLs, generateEventCodeHTML, generateEventLabel, generateProxyCallLabel, generateURL, generateHighlightedCode } from './helpers.js'
 import { setupEventSource } from './sse.js';
 
 import { animationDuration } from './animation-duration.js';
@@ -9,6 +9,7 @@ import { animationDuration } from './animation-duration.js';
 import './theme.js';
 
 import { modules, root, views, requests, renderInfo, VERSION, isOffline, filepathPrefix } from './globals.js'
+import { generateLinkedSVG } from './svg.js';
 
 marked.setOptions({
 	highlight(code, language){
@@ -48,6 +49,13 @@ let eventHighlights = document.querySelector('#eventHighlights').checked
 document.querySelector('#eventHighlights').addEventListener('change', e => {
 	eventHighlights = e.currentTarget.checked;
 	renderRequestPath()
+})
+
+
+let codeTooltips = document.querySelector('#codeTooltips').checked
+document.querySelector('#codeTooltips').addEventListener('change', e => {
+	codeTooltips = e.currentTarget.checked;
+	renderCodeTooltips()
 })
 
 if (!isOffline) setupEventSource(requests, () => {
@@ -130,7 +138,10 @@ for (const [id, { x, y }] of Object.entries(JSON.parse(localStorage.getItem('loc
 
 cy.on('dbltap', 'node', function () {
 	const url = this.data('href')
-	if (url) window.open(url, '_blank')
+	if (!url) return;
+
+	if (url.includes('http')) window.open(url, '_blank');
+	else window.location.href = url;
 });
 const locations = (() => {
 	const locs = JSON.parse(localStorage.getItem('locations') || '{}');
@@ -148,6 +159,9 @@ cy.on('pan', function () {
 	const info = JSON.parse(localStorage.getItem('info') || '{}')
 	info.pan = cy.pan()
 	localStorage.setItem('info', JSON.stringify(info))
+	for (const tip of codeTooltipTippys){
+		tip.setProps({ getReferenceClientRect: cy.$(`[id="${tip.r2NodeId}"]`).popperRef().getBoundingClientRect })
+	}
 	if (!renderInfo.lastNode) return;
 	renderInfo.tip.setProps({ getReferenceClientRect: renderInfo.lastNode.popperRef().getBoundingClientRect })
 });
@@ -155,6 +169,11 @@ cy.on('zoom', function () {
 	const info = JSON.parse(localStorage.getItem('info') || '{}')
 	info.zoom = cy.zoom()
 	localStorage.setItem('info', JSON.stringify(info))
+	for (const tip of codeTooltipTippys){
+		tip.setProps({ getReferenceClientRect: cy.$(`[id=${tip.r2NodeId}]`).popperRef().getBoundingClientRect })
+	}
+	if (!renderInfo.lastNode) return;
+	renderInfo.tip.setProps({ getReferenceClientRect: renderInfo.lastNode.popperRef().getBoundingClientRect })
 });
 
 const bb = cy.bubbleSets();
@@ -259,7 +278,35 @@ function renderWindow(id, { title, body }, ...buttons) {
 	const window = document.querySelector(`#window${id}`);
 	window.dataset.body = JSON.stringify(body);
 	window.dataset.title = JSON.stringify(title);
-	updateWindowHTML(window, body, title, ...buttons)
+	updateWindowHTML(window, body, title, {
+		innerHTML: '🗖',
+		onclick: () => maximizeMinimizeToggle(window)
+	}, ...buttons)
+}
+
+for (let i = 1; i <= 7; i++){
+	const window = document.querySelector('#window' + i);
+	updateWindowHTML(window, undefined, undefined, {
+		innerHTML: '🗖',
+		onclick: () => maximizeMinimizeToggle(window)
+	})
+}
+
+function maximizeMinimizeToggle(window){
+	if (window.dataset.maximized){
+		const { top, left, width, height } = JSON.parse(window.dataset.maximized);
+		window.style.top = top;
+		window.style.left = left;
+		window.style.width = width;
+		window.style.height = height;
+		delete window.dataset.maximized;
+	} else {
+		window.dataset.maximized = JSON.stringify({ top: window.style.top, left: window.style.left, width: window.style.width, height: window.style.height })
+		window.style.top = '1vh';
+		window.style.left = '1vw';
+		window.style.width = '98vw';
+		window.style.height = '93vh';
+	}
 }
 
 function generateEventNodes(event, forward) {
@@ -286,8 +333,14 @@ function generateEventNodes(event, forward) {
 function generateEventTooltipContent(event, urls){
 	let content = document.createElement('div');
 
-	content.innerHTML = generateEventLabel(event);
-	content.innerHTML += '<br/>' + Object.entries(urls).filter(([_, url]) => url && !url.includes('node_modules') && !url.includes('express-handler-tracker')).reduce((lines, [name, url]) => [...lines, `<a target="_blank" href="${url}">${name[0].toUpperCase() + name.slice(1)}</a>`], []).join('<br/>')
+	content.innerHTML = generateEventLabel(event).replace(/\n/g, '<br/>');
+	content.innerHTML += '<br/>' + Object.entries(urls).filter(([_, url]) => url && !url.includes('node_modules') && !url.includes('express-handler-tracker')).reduce((lines, [name, url]) => [...lines, `<a ${url.includes('http') ? 'target="_blank"' : ''} href="${url}">${name[0].toUpperCase() + name.slice(1)}</a>`], []).join('<br/>')
+	if (event.annotation){
+		const annotationContent = event.annotation.split('[//]: # (Start Annotation)').at(1)?.split('[//]: # (End Annotation)')[0].trim()
+		if (annotationContent) {
+			content.innerHTML += marked.parse(annotationContent)
+		}
+	}
 
 	return content;
 }
@@ -373,7 +426,7 @@ async function renderMiddleware() {
 	if (!renderInfo.forward) remaining.reverse()
 
 	const w5 = document.querySelector('#window5 pre')
-	w5.innerHTML = generateEventCodeHTML(event);
+	w5.innerHTML = generateEventCodeHTML(event, urls);
 	attachRenderListeners(w5)
 
 	const currentInAll = document.querySelector(`details[data-event-id="${event.start}"]`)
@@ -410,23 +463,24 @@ async function renderMiddleware() {
 		let ref = node.popperRef(); // used only for positioning
 		// A dummy element must be passed as tippy only accepts dom element(s) as the target
 		// https://atomiks.github.io/tippyjs/v6/constructor/#target-types
-		let dummyDomEle = document.querySelector('#tooltippy');
 
-		if (!renderInfo.tip) renderInfo.tip = new tippy(dummyDomEle, { // tippy props:
-			getReferenceClientRect: ref.getBoundingClientRect, // https://atomiks.github.io/tippyjs/v6/all-props/#getreferenceclientrect
-			trigger: 'manual', // mandatory, we cause the tippy to show programmatically.
-			allowHTML: true,
-			appendTo: document.body,
-			interactive: true,
-			placement: 'bottom',
-			hideOnClick: false,
-			duration: [0, 0],
-			zIndex: 50,
+		if (!renderInfo.tip) {
+			renderInfo.tip = addTippyContentUI(new tippy(document.querySelector('#tooltippy'), { // tippy props:
+				getReferenceClientRect: ref.getBoundingClientRect, // https://atomiks.github.io/tippyjs/v6/all-props/#getreferenceclientrect
+				trigger: 'manual', // mandatory, we cause the tippy to show programmatically.
+				allowHTML: true,
+				appendTo: document.body,
+				interactive: true,
+				placement: 'bottom',
+				hideOnClick: false,
+				duration: [0, 0],
+				zIndex: 50,
 
-			// your own custom props
-			// content prop can be used when the target is a single element https://atomiks.github.io/tippyjs/v6/constructor/#prop
-			content: generateEventTooltipContent.bind(null, event, urls)
-		})
+				// your own custom props
+				// content prop can be used when the target is a single element https://atomiks.github.io/tippyjs/v6/constructor/#prop
+				content: generateEventTooltipContent.bind(null, event, urls)
+			}))
+		}
 		else {
 			function percentileDiff(a, b, percent) {
 				return (b - a) * percent + a
@@ -576,6 +630,129 @@ function extractRanges(numbers) {
 	return ranges.join(',');
 }
 
+const PLACEMENTS = [
+	'top-start',
+	'top-end',
+	'right',
+	'right-start',
+	'right-end',
+	'bottom',
+	'bottom-start',
+	'bottom-end',
+	'left',
+	'left-start',
+	'left-end',
+]
+
+
+function addTippyContentUI(tip){
+	const content = document.createElement('div');
+
+	const close = document.createElement('button');
+	close.classList = 'close-tippy'
+	close.textContent = 'x'
+	close.addEventListener('click', () => tip.hide())
+	content.appendChild(close)
+
+	const placementToggle = document.createElement('button');
+	placementToggle.classList = 'cycle-placement'
+	placementToggle.textContent = '↻'
+	placementToggle.addEventListener('click', () => {
+		const placement = PLACEMENTS[(PLACEMENTS.indexOf(tip.props.placement) + 1) % PLACEMENTS.length];
+		tip.setProps({ placement })
+		console.log(tip.props.placement, placement)
+		tip.setProps({ getReferenceClientRect: cy.$(`[id="${tip.r2NodeId}"]`).popperRef().getBoundingClientRect })
+	})
+	content.appendChild(placementToggle)
+
+	content.appendChild(tip.props.content)
+
+	tip.setContent(content)
+
+	const setContent = tip.setContent;
+	tip.setContent = newContent => {
+		content.innerHTML = '';
+		content.appendChild(close)
+		content.appendChild(placementToggle)
+		content.appendChild(newContent)
+		return setContent.call(tip, content)
+	}
+	return tip;
+}
+
+const codeTooltipTippys = [];
+
+function renderCodeTooltips() {
+	codeTooltipTippys.forEach(tip => tip.hide())
+	codeTooltipTippys.splice(0, codeTooltipTippys.length);
+
+	if (!codeTooltips) return
+
+	const nodeInfos = {}
+
+	const elements = Object.values(cy.elements()).map(cye => {
+		if (typeof cye?.data === 'function') return { data: cye.data() }
+		else return { data: {} }
+	})
+
+	let i = 0;
+
+	for (const [ei, e] of renderInfo.request.events.entries()) {
+		const label = generateEventLabel(e);
+		const urls = generateEventURLs(e)
+		const allCodes = generateHighlightedCode(e)
+		for (const o of allCodes) {
+			o.i = i++;
+			o.label = label;
+			o.url = urls[o.key]
+			const node = sourceLineToID(elements, o.url.split('//').at(-1))
+			if (!node) {
+				console.log('MISSING', o.url)
+			} else {
+				if (!(node.data.id in nodeInfos)) nodeInfos[node.data.id] = {
+					i: ei, infos: []
+				}
+				nodeInfos[node.data.id].infos.push(o)
+			}
+		}
+		// vscode://file/home/rascal_two/Desktop/Code/Unknown/GitHub/PairwiseSorter/server.js:26:5
+		// to filename
+
+		/*let nextHTML = generateEventCodeHTML(e);
+
+		if (nextHTML === lastHTML || lastHTML.includes(nextHTML)) nextHTML = 'SAME'
+		if (nextHTML !== 'SAME') lastHTML = nextHTML
+		w6.innerHTML += `<details open data-event-id="${e.start}"><summary>${generateEventLabel(e)} <button>Render</button></summary>${nextHTML === 'SAME' ? i ? 'Same as previous' : '' : nextHTML}</details>`*/
+	}
+
+	for (const [nid, { i, infos }] of Object.entries(nodeInfos)){
+		const node = cy.$(`[id="${nid}"]`)
+		let ref = node.popperRef();
+		const tip = new tippy(document.querySelector('#tooltippy'), { // tippy props:
+			getReferenceClientRect: ref.getBoundingClientRect, // https://atomiks.github.io/tippyjs/v6/all-props/#getreferenceclientrect
+			trigger: 'manual', // mandatory, we cause the tippy to show programmatically.
+			allowHTML: true,
+			appendTo: document.body,
+			interactive: true,
+			placement: 'auto',
+			hideOnClick: false,
+			duration: [0, 0],
+			zIndex: 10 + i,
+
+			// your own custom props
+			// content prop can be used when the target is a single element https://atomiks.github.io/tippyjs/v6/constructor/#prop
+			content: () => {
+				let content = document.createElement('pre');
+				content.innerHTML = infos.map(info => `<a href="${info.url}">#${info.i} - ${info.label}</a>` + info.html).join('<br/>')
+				return content;
+			}
+		})
+		tip.r2NodeId = nid
+		tip.show()
+		codeTooltipTippys.push(addTippyContentUI(tip))
+	}
+}
+
 function renderRequestPath() {
 	cy.edges('.request-edge').removeClass('request-edge').data('label', '').data('order', []);
 	cy.nodes('.request-node').removeClass('request-node').data('order', []).forEach(n => n.data('label', n.data('baseLabel') || n.data('label')));
@@ -656,6 +833,7 @@ function renderRequest() {
 	renderMiddleware();
 	renderBubbles()
 	renderMiddlewaresSelect()
+	renderCodeTooltips()
 	if (!renderInfo.request) return
 
 	const w6 = document.querySelector('#window6 pre')
@@ -736,7 +914,7 @@ document.querySelector('#save-as-png').addEventListener('click', () => {
 
 document.querySelector('#save-as-svg').addEventListener('click', () => {
 	const svgWindow = window.open("", 'SVG', '_blank')
-	svgWindow.document.body.innerHTML = cy.svg({
+	const rawSVG = cy.svg({
 		bg: document.querySelector('#transparentBackground').checked
 			? 'transparent'
 			: document.querySelector('#darkTheme').checked
@@ -744,6 +922,15 @@ document.querySelector('#save-as-svg').addEventListener('click', () => {
 				: 'white',
 		full: true
 	})
+	svgWindow.document.body.innerHTML = rawSVG;
+	svgWindow.document.body.innerHTML = generateLinkedSVG(svgWindow.document.body.children[0], document.querySelector('#root-input').value || root);
+
+	const linkedSVG = svgWindow.document.body.innerHTML;
+
+	const downloadBtn = document.createElement('button');
+	downloadBtn.textContent = 'Download';
+	downloadBtn.addEventListener('click', () => downloadBlob(new Blob([linkedSVG], { type: 'image/svg+xml' }), 'graph.svg'))
+	svgWindow.document.body.appendChild(downloadBtn);
 });
 
 const openMarkdownModal = (() => {
@@ -828,7 +1015,19 @@ const openMarkdownModal = (() => {
 			zoom: cy.zoom(),
 			pan: cy.pan()
 		}
-		if (modal.querySelector('#layout-style-rules').checked) data.styleRules = JSON.parse(localStorage.getItem('style-rules') || '{}');
+		if (modal.querySelector('#layout-style-rules').checked) {
+			data.styleRules = JSON.parse(localStorage.getItem('style-rules') || '{}');
+			data.layoutValues = {
+				'layout-options': document.querySelector('#layout-options').value,
+				'animation-duration': document.querySelector('#animation-duration').value,
+				allEdges: document.querySelector('#allEdges').checked,
+				eventNumbers: document.querySelector('#eventNumbers').checked,
+				allNodes: document.querySelector('#allNodes').checked,
+				darkTheme: document.querySelector('#darkTheme').checked,
+				eventHighlights: document.querySelector('#eventHighlights').checked,
+				codeTooltips: document.querySelector('#codeTooltips').checked,
+			}
+		}
 		const selectedRequests = Object.fromEntries([...modal.querySelectorAll('ul input[type="checkbox"]:checked')].map(checkbox => {
 			const id = checkbox.id.split('-')[0];
 			return [id, requests[id]];
@@ -917,7 +1116,7 @@ const openMarkdownModal = (() => {
 		if (inputs[1].value) text = inputs[1].value;
 		if (inputs[2].value) text = localStorage.getItem('saved-requests-' + localName);
 
-		const { windows, graph, styleRules, requests: newRequests, paths, VERSION } = deserialize(JSON.parse(text))
+		const { windows, graph, styleRules, layoutValues, requests: newRequests, paths, VERSION } = deserialize(JSON.parse(text))
 		if (windows) {
 			for (let i = 0; i < windows.length; i++) {
 				localStorage.setItem('window' + (i + 1) + '-style', windows[i])
@@ -950,6 +1149,16 @@ const openMarkdownModal = (() => {
 		}
 		if (styleRules) {
 			localStorage.setItem('style-rules', JSON.stringify(styleRules))
+		}
+		if (layoutValues){
+			document.querySelector('#layout-options').value = layoutValues['layout-options'];
+			document.querySelector('#animation-duration').value = layoutValues['animation-duration'];
+			document.querySelector('#allEdges').checked = layoutValues.allEdges;
+			document.querySelector('#eventNumbers').checked = layoutValues.eventNumbers;
+			document.querySelector('#allNodes').checked = layoutValues.allNodes;
+			document.querySelector('#darkTheme').checked = layoutValues.darkTheme;
+			document.querySelector('#eventHighlights').checked = layoutValues.eventHighlights;
+			document.querySelector('#codeTooltips').checked = layoutValues.codeTooltips;
 		}
 		localStorage.setItem('importing-info', JSON.stringify({
 			...paths,

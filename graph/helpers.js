@@ -39,9 +39,7 @@ export function generateEventURLs(event, lineNumber = true) {
 	}
 }
 
-export function generateEventCodeHTML(event) {
-	const urls = generateEventURLs(event)
-
+export function generateHighlightedCode(event, urls = generateEventURLs(event)){
 	const codes = Object.fromEntries(Object.entries({
 		added: event.handler?.code?.add,
 		evaluated: event.evaluate?.code,
@@ -58,7 +56,11 @@ export function generateEventCodeHTML(event) {
 		});
 	}
 
-	return allLines.map(({ key, html }) => `${key[0].toUpperCase() + key.slice(1)} <a target="_blank" href="${urls[key]}">${urls[key].replace(filepathPrefix, '')}</a><br/><code>${html}</code>`).join('<br/>');
+	return allLines
+}
+
+export function generateEventCodeHTML(event, urls = generateEventURLs(event)) {
+	return generateHighlightedCode(event, urls).map(({ key, html }) => `${key[0].toUpperCase() + key.slice(1)} <a ${urls[key].includes('http') ? 'target="_blank"' : ''} href="${urls[key]}">${urls[key].replace(filepathPrefix, '')}</a><br/><code>${html}</code>`).join('<br/>');
 }
 
 export function generateProxyCallLabel(event, content = '.'.repeat(event.args.count)) {
@@ -86,7 +88,7 @@ export function generateEventLabel(event) {
 	else if (event.type === 'proxy-evaluate') label = generateProxyCallLabel(event);
 	if (event.end && event.start) label += ' - ' + (event.end - event.start).toFixed(2) + 'ms';
 
-	if (event.type === 'start') label = `Started`
+	if (event.type === 'start') label = `Started\n`
 	if (event.type === 'finish') label = `Finished in ${(event.end - renderInfo.request.id).toFixed(2)} ms`
 
 	return label
