@@ -399,7 +399,7 @@ function proxyInfoToEvent(info, url, location) {
 		} : undefined,
 		source,
 		label,
-		code: getLinesFromFilepathWithLocation(source),
+		code: source ? getLinesFromFilepathWithLocation(source) : undefined,
 		args: {
 			string: argv,
 			count: argc

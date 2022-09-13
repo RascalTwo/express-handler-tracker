@@ -697,7 +697,7 @@ function renderCodeTooltips() {
 
 	let i = 0;
 
-	for (const [ei, e] of renderInfo.request.events.entries()) {
+	for (const [ei, e] of renderInfo.request?.events.entries() || []) {
 		const label = generateEventLabel(e);
 		const urls = generateEventURLs(e)
 		const allCodes = generateHighlightedCode(e)

@@ -9,7 +9,7 @@ export const requests = await (async () => {
 	}
 	if (isOffline) return getLocalInfo()
 
-	return fetch('../requests').then(r => r.text()).then(async raw => deserialize(JSON.parse(raw))).catch(err => {
+	return fetch('./requests').then(r => r.text()).then(async raw => deserialize(JSON.parse(raw))).catch(err => {
 		console.error(err);
 		return getLocalInfo()
 	});
@@ -22,7 +22,7 @@ export const { modules, root, views, VERSION } = await (async () => {
 	}
 	if (isOffline) return getLocalInfo()
 
-	return fetch('../info').then(r => r.json()).catch(async err => {
+	return fetch('./info').then(r => r.json()).catch(async err => {
 		console.error(err);
 		return getLocalInfo()
 	});

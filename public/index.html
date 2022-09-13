@@ -1,3 +1,344 @@
-<script>
-	window.location.href = window.location.href.split('/').slice(0, -1).join('/') + '/graph/graph.html'
-</script>
+<!DOCTYPE html>
+<html lang="en">
+
+	<head>
+		<meta charset="UTF-8">
+		<meta name="viewport" content="width=device-width, initial-scale=1.0">
+		<title>Express Handler Tracker - Request Network Graph</title>
+
+		<link rel="stylesheet" href="paper.min.css" />
+
+		<script src="deserialize.js"></script>
+		<script src="serialize.js"></script>
+		<script src="library/cytoscape.min.js"></script>
+
+		<script src="library/cola.js"></script>
+		<script src="library/cytoscape-cola.js"></script>
+
+		<script src="library/dagre.min.js"></script>
+		<script src="library/cytoscape-dagre.js"></script>
+
+		<script src="library/cytoscape-euler.js"></script>
+
+		<script src="library/klay.js"></script>
+		<script src="library/cytoscape-klay.js"></script>
+
+		<script src="library/elk.bundled.js"></script>
+		<script src="library/cytoscape-elk.js"></script>
+
+		<script src="library/popper.min.js"></script>
+		<script src="library/tippy-bundle.umd.js"></script>
+		<script src="library/cytoscape-popper.js"></script>
+
+		<script src="library/cytoscape-layers.js"></script>
+		<script src="library/cyroscape-bubblesets.js"></script>
+
+		<link rel="stylesheet" href="library/window-engine.css">
+
+		<script src="library/escape-html.js"></script>
+
+		<script src="library/highlight.min.js"></script>
+		<link rel="stylesheet" href="library/github-dark.min.css" />
+		<script
+			src="library/highlightjs-line-numbers.min.js"></script>
+		<link href="graph.css" rel="stylesheet" />
+		<script src="library/jsondiffpatch/jsondiffpatch.umd.js"></script>
+		<link rel="stylesheet" href="library/jsondiffpatch/html.css" type="text/css" />
+		<script src="library/cytoscape-svg.js"></script>
+		<script src="library/marked.min.js" integrity="sha512-DZIC9m2IbFlio5GE2oKD6/veW6NXML5Cbo9FHnba7Q9R4OCPelWw9R5QpupcPPLSv0euhuRr+5JV5pWl3X3nSg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+	</head>
+
+	<body>
+		<div id="cy-div"></div>
+
+		<span id="tooltippy"></span>
+
+		<div class="windowGroup">
+			<div id="window1" class="window black fade small">
+				<div class="purple">
+					<p class="windowTitle">Request</p>
+				</div>
+				<br /><br />
+				<div class="mainWindow">
+					<pre></pre>
+				</div>
+			</div>
+			<div id="window2" class="window black fade small">
+				<div class="orange">
+					<p class="windowTitle">Response</p>
+				</div>
+				<br /><br />
+				<div class="mainWindow">
+					<pre></pre>
+				</div>
+			</div>
+			<div id="window3" class="window fade small">
+				<div class="brown">
+					<p class="windowTitle">Layout</p>
+				</div>
+				<br /><br />
+				<div class="mainWindow">
+					<div class="content-wrapper">
+						<label for="layout-options">Placement Algorithm</label>
+						<div class="form-group"><select id="layout-options"></select></div>
+						<div class="toggles-wrapper">
+							<span class="form-group">
+								<label for="groups" class="paper-switch-tile">
+									<input id="groups" type="checkbox" checked />
+									<div class="paper-switch-tile-card border">
+										<div class="paper-switch-tile-card-front border">Bubbles</div>
+										<div class="paper-switch-tile-card-back border background-primary">Groups</div>
+									</div>
+								</label>
+							</span>
+							Edges
+							<span class="form-group">
+								<label for="allEdges" class="paper-switch-tile">
+									<input id="allEdges" type="checkbox" checked />
+									<div class="paper-switch-tile-card border">
+										<div class="paper-switch-tile-card-front border">Request</div>
+										<div class="paper-switch-tile-card-back border background-primary">All</div>
+									</div>
+								</label>
+							</span>
+							<span class="form-group">
+								<label for="eventNumbers" class="paper-switch-label">
+									Event Numbers
+								</label>
+								<label class="paper-switch">
+									<input id="eventNumbers" name="eventNumbers" type="checkbox" checked />
+									<span class="paper-switch-slider"></span>
+								</label>
+							</span>
+						</div>
+						<div class="toggles-wrapper">
+							Nodes
+							<span class="form-group">
+								<label for="allNodes" class="paper-switch-tile">
+									<input id="allNodes" type="checkbox" checked />
+									<div class="paper-switch-tile-card border">
+										<div class="paper-switch-tile-card-front border">Request</div>
+										<div class="paper-switch-tile-card-back border background-primary">All</div>
+									</div>
+								</label>
+							</span>
+							Theme
+							<span class="form-group">
+								<label for="darkTheme" class="paper-switch-tile">
+									<input id="darkTheme" type="checkbox" checked />
+									<div class="paper-switch-tile-card border">
+										<div class="paper-switch-tile-card-front border">Light</div>
+										<div class="paper-switch-tile-card-back border background-primary">Dark</div>
+									</div>
+								</label>
+							</span>
+							<span class="form-group">
+								<label for="eventHighlights" class="paper-switch-label">
+									Request Highlights
+								</label>
+								<label class="paper-switch">
+									<input id="eventHighlights" name="eventHighlights" type="checkbox" checked />
+									<span class="paper-switch-slider"></span>
+								</label>
+							</span>
+						</div>
+						<div class="toggles-wrapper">
+							<span class="form-group">
+							<label for="codeTooltips" class="paper-switch-label">
+									Code Tooltips
+								</label>
+								<label class="paper-switch">
+									<input id="codeTooltips" name="codeTooltips" type="checkbox" checked />
+									<span class="paper-switch-slider"></span>
+								</label>
+							</span>
+						</div>
+						<label for="animation-duration">Animation Duration (ms)</label>
+						<div class="form-group"><input type="range" id="animation-duration" min="0" max="2000" step="100"
+								value="1000"></div>
+						<label>Data</label>
+						<div>
+							<button id="export-data-button">Export</button>
+							<button id="import-data-button">Import</button>
+						</div>
+						<div class="style-rules-wrapper">
+							<button id="add-rule">Add Style Rule</button>
+							<button id="reset-rules">Reset All Rules</button>
+							<table>
+								<thead>
+									<tr>
+										<th>Pattern</th>
+										<th>Color</th>
+										<th>Shape</th>
+										<th>Actions</th>
+									</tr>
+								</thead>
+								<tbody>
+								</tbody>
+							</table>
+						</div>
+					</div>
+				</div>
+			</div>
+			<div id="window4" class="window fade small">
+				<div class="cyan">
+					<p class="windowTitle">Events</p>
+				</div>
+				<br /><br />
+				<div class="mainWindow">
+					<div class="content-wrapper">
+						<label for="requests">Request</label>
+						<div><select id="requests"></select><button id="delete-request">Delete</button></div>
+
+						<label id="event-small"></label>
+						<select id="events" multiple>Events</select>
+					</div>
+				</div>
+			</div>
+			<div id="window5" class="window fade black small">
+				<div class="crimson">
+					<p class="windowTitle">Current Code</p>
+				</div>
+				<br /><br />
+				<div class="mainWindow">
+					<pre></pre>
+				</div>
+			</div>
+			<div id="window6" class="window fade black small">
+				<div class="green">
+					<p class="windowTitle">All Code</p>
+				</div>
+				<br /><br />
+				<div class="mainWindow">
+					<pre></pre>
+				</div>
+			</div>
+			<div id="window7" class="window fade black small">
+				<div class="green">
+					<p class="windowTitle">Annotation</p>
+				</div>
+				<br /><br />
+				<div class="mainWindow">
+					<pre></pre>
+				</div>
+			</div>
+		</div>
+
+
+		<footer>
+			<button id="button3">Layout</button>
+			<button id="button4">Events</button>
+			<button id="button1">Request</button>
+			<button id="button2">Response</button>
+			<button id="button7">Annotation</button>
+			<button id="button5">Current Code</button>
+			<button id="button6">All Code</button>
+			<span id="meter-wrapper">
+				0ms
+					<meter min="0" max="10" value="5">5/10</meter>
+				1000ms
+			</span>
+			<button id="reset-windows">Reset Windows</button>
+			<button id="reset-all">Reset All</button>
+			<span id="progress-wrapper">
+				1
+				<progress min="1" max="10" value="5">5/10</progress>
+				10
+			</span>
+		</footer>
+
+		<input class="modal-state" id="modal-1" type="checkbox" autocomplete="off">
+		<form class="modal">
+			<label class="modal-bg" for="modal-1"></label>
+			<div class="modal-body">
+				<label class="btn-close" for="modal-1">X</label>
+				<h4 class="modal-title">Export Data</h4>
+				<div class="form-group">
+					<label for="layout-windows-checkbox" class="paper-check">
+						<input type="checkbox" name="paperChecks" id="layout-windows-checkbox"> <span>Windows</span>
+					</label>
+					<label for="layout-graph-checkbox" class="paper-check">
+						<input type="checkbox" name="paperChecks" id="layout-graph-checkbox"> <span>Node Positions</span>
+					</label>
+					<label for="layout-style-rules" class="paper-check">
+						<input type="checkbox" name="paperChecks" id="layout-style-rules"> <span>Style Rules</span>
+					</label>
+				</div>
+				<fieldset>
+					<legend>Requests</legend>
+					<button type="button" id="invert-button">Invert</button>
+					<button type="button" id="all-button">All</button>
+					<ul class="form-group" style="max-height: 33vh; overflow: scroll; padding: 1rem;">
+					</ul>
+				</fieldset>
+				<fieldset>
+					<legend>Pathing</legend>
+					<div class="form-group">
+						<label for="root-input">Root</label>
+						<input id="root-input">
+						<label for="views-directory-input">Views Directory</label>
+						<input id="views-directory-input">
+						<label for="views-extension-input">Views Extension</label>
+						<input id="views-extension-input">
+					</div>
+				</fieldset>
+				<button type="button" id="download-data">Download</button>
+				<button type="button" id="copy-data">Copy</button>
+				<div class="form-group" autocomplete="off">
+					<label for="export-data-input">Local Storage</label>
+					<input id="export-data-input" list="export-data-datalist">
+					<datalist id="export-data-datalist">
+					</datalist>
+					<button>Export</button>
+				</div>
+				<fieldset>
+					<legend>Images</legend>
+					<div class="form-group">
+						<label for="transparentBackground" class="paper-switch-label">
+							Transparent Background
+						</label>
+						<label class="paper-switch">
+							<input id="transparentBackground" name="transparentBackground" type="checkbox" />
+							<span class="paper-switch-slider"></span>
+						</label>
+					</div>
+					<button type="button" id="save-as-png">PNG</button>
+					<button type="button" id="save-as-svg">SVG</button>
+				</fieldset>
+			</div>
+		</form>
+
+		<input class="modal-state" id="modal-2" type="checkbox" autocomplete="off">
+		<form class="modal">
+			<label class="modal-bg" for="modal-2"></label>
+			<div class="modal-body">
+				<label class="btn-close" for="modal-2">X</label>
+				<h4 class="modal-title">Import Data</h4>
+				<input id="import-data-file" type="file" />
+				<textarea id="import-data-text"></textarea>
+				<div autocomplete="off">
+					<label for="import-data-select">Local Storage</label>
+					<div class="form-group"><select id="import-data-select"></select></div>
+				</div>
+				<button>Import</button>
+			</div>
+		</form>
+
+		<input class="modal-state" id="modal-3" type="checkbox" autocomplete="off">
+		<form class="modal">
+			<label class="modal-bg" for="modal-3"></label>
+			<div class="modal-body">
+				<label class="btn-close" for="modal-3">X</label>
+				<h4 class="modal-title">Set Annotation Markdown</h4>
+				<textarea autocomplete="off"></textarea>
+				<button>Set</button>
+			</div>
+		</form>
+
+		<span id="connection-indicator"></span>
+
+		<script src="library/window-engine.js"></script>
+		<script src="graph.js" type="module"></script>
+	</body>
+
+</html>
