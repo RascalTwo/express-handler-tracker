@@ -352,15 +352,29 @@ async function jumpToAnnotatedEvent(change){
 		found = i;
 		break;
 	}
-	if (found === null) return;
+	if (found === null) return false;
 	while (renderInfo.middlewareIndex !== found) {
 		renderInfo.middlewareIndex += change;
 		await renderMiddleware()
-		await new Promise(r => setTimeout(r, 100));
+		await new Promise(r => setTimeout(r, animationDuration));
 	}
+	return true;
 }
 
+let annotationPlaying = false;
+
 document.querySelector('#footer-prev-annotation').addEventListener('click', () => jumpToAnnotatedEvent(-1))
+document.querySelector('#footer-pause-annotation').addEventListener('click', () => {
+	annotationPlaying = false;
+})
+document.querySelector('#footer-play-annotation').addEventListener('click', async () => {
+	if (annotationPlaying) return;
+	annotationPlaying = true;
+	while (annotationPlaying){
+		annotationPlaying = await jumpToAnnotatedEvent(1);
+		await new Promise(r => setTimeout(r, animationDuration))
+	}
+})
 document.querySelector('#footer-next-annotation').addEventListener('click', () => jumpToAnnotatedEvent(1))
 
 const editJSONButton = (getJSON, submitJSON) => ({
@@ -378,7 +392,7 @@ async function renderMiddleware() {
 	document.querySelector('meter').value = duration
 	document.querySelector('#meter-wrapper').childNodes[0].nodeValue = (+duration.toFixed(0)).toLocaleString() + 'ms'
 	document.querySelector('progress').value = renderInfo.middlewareIndex + 1
-	document.querySelector('#progress-wrapper').childNodes[0].nodeValue = renderInfo.middlewareIndex + 1
+	document.querySelector('#progress-wrapper').childNodes[4].nodeValue = renderInfo.middlewareIndex + 1
 	if (event.diffs) {
 		for (const [i, key] of ['request', 'response'].entries()){
 			if (!event.diffs[key]) {
@@ -513,10 +527,11 @@ async function renderMiddleware() {
 
 	const remainingNodes = generateEventNodes(event, renderInfo.forward).reverse()
 
-	if (!remainingNodes.length) remainingNodes.push(renderInfo.lastNode)
+	if (!remainingNodes.length && renderInfo.lastNode) remainingNodes.push(renderInfo.lastNode)
+	if (!remainingNodes.length) remainingNodes.push(cy.nodes()[0])
 
 	disableButtons()
-	await new Promise(r => setTimeout(r, 100));
+	await new Promise(r => setTimeout(r, animationDuration));
 	while (remainingNodes.length) {
 		const target = remainingNodes.pop()
 
@@ -583,7 +598,7 @@ async function renderMiddleware() {
 		}
 		renderInfo.tip.show();
 	}
-	setTimeout(() => enableButtons(), 100);
+	setTimeout(() => enableButtons(), animationDuration);
 }
 
 const requestSelect = document.querySelector('#requests');
@@ -638,13 +653,14 @@ document.querySelector('#delete-event').addEventListener('click', () => {
 
 
 function changeMiddleware(nth) {
-	if (renderInfo.animating) return
+	if (renderInfo.animating) return false
 	let oldNth = renderInfo.middlewareIndex;
 	renderInfo.middlewareIndex = nth;
 	renderInfo.forward = renderInfo.middlewareIndex > oldNth;
 	renderMiddleware();
 
 	document.querySelector('#events').selectedOptions[0]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+	return true;
 }
 
 document.querySelector('#events').addEventListener('change', e => {
@@ -676,7 +692,7 @@ function renderMiddlewaresSelect() {
 	document.querySelector('meter').value = 0;
 	document.querySelector('meter').max = duration;
 
-	document.querySelector('#progress-wrapper').childNodes[2].nodeValue = renderInfo.request.events.length
+	document.querySelector('#progress-wrapper').childNodes[6].nodeValue = renderInfo.request.events.length
 	document.querySelector('progress').max = renderInfo.request.events.length;
 }
 
@@ -944,7 +960,7 @@ function enableButtons() {
 }
 function disableButtons() {
 	renderInfo.animating = true;
-	document.querySelectorAll('input, textarea, button, select').forEach(b => b.disabled = true)
+	document.querySelectorAll('input, textarea, button:not([id^="footer-pause"]), select').forEach(b => b.disabled = true)
 }
 
 renderRequest()
@@ -965,6 +981,26 @@ window.addEventListener('keydown', ({ target, key }) => {
 			break
 	}
 });
+let eventPlaying = false;
+document.querySelector('#footer-pause-event').addEventListener('click', () => {
+	eventPlaying = false;
+})
+document.querySelector('#footer-play-event').addEventListener('click', async () => {
+	if (eventPlaying) return;
+	eventPlaying = true;
+	while (eventPlaying){
+		let nextNth = Math.min(Math.max(renderInfo.middlewareIndex + 1, 0), renderInfo.request.events.length - 1)
+		if (nextNth === renderInfo.middlewareIndex) eventPlaying = false;
+		else {
+			renderInfo.middlewareIndex = nextNth
+			await renderMiddleware()
+			await new Promise(r => setTimeout(r, animationDuration))
+		}
+	}
+})
+document.querySelector('#footer-prev-event').addEventListener('click', () => changeMiddleware(Math.min(Math.max(renderInfo.middlewareIndex - 1, 0), renderInfo.request.events.length - 1)))
+
+document.querySelector('#footer-next-event').addEventListener('click', () => changeMiddleware(Math.min(Math.max(renderInfo.middlewareIndex + 1, 0), renderInfo.request.events.length - 1)))
 
 function updateRequestInfo(request, updates){
 	fetch('./update-request/' + request.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
