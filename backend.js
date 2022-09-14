@@ -1,33 +1,52 @@
 import { viewInfo } from "./globals.js";
 import { importData } from "./helpers.js";
 
-const BACKEND_URL = 'http://localhost:3030/';
+const BACKEND_URL = 'https://r2-eht-backend.herokuapp.com/';
 
 let token = localStorage.getItem('backend-token')
 
-const params = new URLSearchParams(window.location.search)
-if (params.has('token')) {
-	token = params.get('token')
+const searchParams = new URLSearchParams(window.location.search)
+const hashParams = new URLSearchParams(window.location.hash.slice(1))
+const params = {
+	...Object.fromEntries(searchParams.entries()),
+	...Object.fromEntries(hashParams.entries())
+}
+
+if ('token' in params) {
+	token = params['token']
 	localStorage.setItem('backend-token', token)
-	params.delete('token')
-	window.location.search = params.toString() ? '?' + params.toString() : ''
+
+	if (searchParams.has('token')) {
+		searchParams.delete('token')
+		window.location.search = params.toString() ? '?' + params.toString() : ''
+	}
+	else {
+		hashParams.delete('token')
+		window.location.hash = params.toString() ? '#' + params.toString() : ''
+	}
+}
+
+function getGithubInfoFromUsername(username){
+	return fetch('https://api.github.com/users/' + username).then(r => r.json())
 }
 
 (async () => {
 	const parts = window.location.hash.slice(2).split('/');
-	const [owner, repository, author, slug] = parts;
-	if (!owner) return
+	const [owner, repository, authorThing, slug] = parts;
+
+	let authorId = authorThing
+	if (authorThing && isNaN(authorThing)) authorId = await getGithubInfoFromUsername(authorThing).then(r => r.id)
 
 	if (
 		viewInfo.external.owner === owner &&
 		viewInfo.external.repository === repository &&
-		viewInfo.external.author === author &&
-		viewInfo.external.slug === slug
+		viewInfo.external.authorId == authorId &&
+		viewInfo.external.slug == slug
 	) return;
 
-	const data = await getDataOptions(owner, repository, author, slug);
+	const data = await getDataOptions(owner, repository, authorId, slug) || [];
 	if (slug) {
-		if (!data.length) return alert(`${slug} in ${owner}/${repository} by ${author} not found`);
+		if (!data.length) return alert(`${slug} in ${owner}/${repository} by ${(await getGithubInfo(authorId)).login} not found`);
 		importData(deserialize(data[0].content), window.cy);
 		return window.location.reload();
 	}
@@ -43,25 +62,26 @@ if (params.has('token')) {
 		`;
 		li.querySelector('button').addEventListener('click', async () => {
 			const data = (await getDataOptions(option.owner, option.repository, option.authorId, option.slug))[0];
-			if (!data) return alert(`${slug} in ${owner}/${repository} by ${author} not found`);
+			if (!data) return alert(`${slug} in ${owner}/${repository} by ${authorThing} not found`);
+			console.log(deserialize(data.content))
 			importData(deserialize(data.content), window.cy);
 			window.location.reload();
 		})
 		frag.appendChild(li);
 		return frag;
 	}, document.createDocumentFragment()));
-	checkbox.checked = true;
+	if (owner) checkbox.checked = true;
 })().catch(console.error);
 
 
 
-export const selfId = await makeBackendFetch('').then(u => u._id)
+export const selfId = await makeBackendFetch('').then(u => u?._id)
 export const selfInfo = selfId ? await getGithubInfo(selfId) : null;
 
 if (selfInfo) document.querySelector('#auth-button img').src = selfInfo.avatar_url
 
 export function makeBackendFetch(relative, options = {}){
-	return fetch(BACKEND_URL + relative, { ...options, headers: { Authorization: 'Bearer ' + token, ...(options.headers || {}) } }).then(r => r.json())
+	return fetch(BACKEND_URL + relative, { ...options, headers: { Authorization: 'Bearer ' + token, ...(options.headers || {}) } }).then(r => r.json()).catch(() => undefined)
 }
 
 function getGithubInfo(id){
@@ -100,7 +120,7 @@ const renderMyLIs = (() => {
 
 
 	async function renderMyLIs(){
-		const mine = await makeBackendFetch('author/' + selfId)
+		const mine = await makeBackendFetch('author/' + selfId) || []
 
 		const ul = modal.querySelector('ul')
 		ul.innerHTML = ''

@@ -61,12 +61,27 @@ document.querySelector('#codeTooltips').addEventListener('change', e => {
 	renderCodeTooltips()
 })
 
-if (!isOffline) setupEventSource(requests, () => {
-	if (!renderInfo.request) renderInfo.request = Object.values(requests)[0]
-	renderRequest()
-	renderRequestsSelect();
-	renderMiddlewaresSelect();
+const connectionIndicator = document.querySelector('#connection-indicator');
+
+connectionIndicator.addEventListener('click', () => {
+	if (!isOffline) return;
+	if (localStorage.getItem('importing-requests') && confirm('Clear imported requests?')){
+		localStorage.removeItem('importing-requests');
+		localStorage.removeItem('importing-info');
+		return window.location.reload();
+	}
 })
+
+if (isOffline) connectionIndicator.dataset.readyState = 'offline';
+else {
+	connectionIndicator.disabled = true;
+	setupEventSource(requests, () => {
+		if (!renderInfo.request) renderInfo.request = Object.values(requests)[0]
+		renderRequest()
+		renderRequestsSelect();
+		renderMiddlewaresSelect();
+	});
+}
 
 window.cy = cytoscape({
 	container: document.getElementById('cy-div'),
@@ -293,9 +308,8 @@ async function jumpToAnnotatedEvent(change){
 	}
 	if (found === null) return false;
 	while (renderInfo.middlewareIndex !== found) {
-		renderInfo.middlewareIndex += change;
-		await renderMiddleware()
-		await new Promise(r => setTimeout(r, animationDuration));
+		await changeMiddleware(renderInfo.middlewareIndex + change);
+		await new Promise(r => setTimeout(r, animationDuration / 5));
 	}
 	return true;
 }
@@ -311,7 +325,7 @@ document.querySelector('#footer-play-annotation').addEventListener('click', asyn
 	annotationPlaying = true;
 	while (annotationPlaying){
 		annotationPlaying = await jumpToAnnotatedEvent(1);
-		await new Promise(r => setTimeout(r, animationDuration))
+		await new Promise(r => setTimeout(r, animationDuration * 10))
 	}
 })
 document.querySelector('#footer-next-annotation').addEventListener('click', () => jumpToAnnotatedEvent(1))
@@ -470,7 +484,7 @@ async function renderMiddleware() {
 	if (!remainingNodes.length) remainingNodes.push(cy.nodes()[0])
 
 	disableButtons()
-	await new Promise(r => setTimeout(r, animationDuration));
+	await new Promise(r => setTimeout(r, animationDuration / 5));
 	while (remainingNodes.length) {
 		const target = remainingNodes.pop()
 
@@ -537,7 +551,8 @@ async function renderMiddleware() {
 		}
 		renderInfo.tip.show();
 	}
-	setTimeout(() => enableButtons(), animationDuration);
+	await new Promise(r => setTimeout(r, animationDuration / 5));
+	enableButtons()
 }
 
 const requestSelect = document.querySelector('#requests');
@@ -895,11 +910,11 @@ requestSelect.addEventListener('change', (e) => {
 
 function enableButtons() {
 	renderInfo.animating = false;
-	document.querySelectorAll('input, textarea, button, select').forEach(b => b.disabled = false)
+	document.querySelectorAll('input, textarea, button:not(#connection-indicator), select').forEach(b => b.disabled = false)
 }
 function disableButtons() {
 	renderInfo.animating = true;
-	document.querySelectorAll('input, textarea, button:not([id^="footer-pause"]), select').forEach(b => b.disabled = true)
+	document.querySelectorAll('input, textarea, button:not([id^="footer-pause"], #connection-indicator), select').forEach(b => b.disabled = true)
 }
 
 renderRequest()
@@ -931,9 +946,8 @@ document.querySelector('#footer-play-event').addEventListener('click', async () 
 		let nextNth = Math.min(Math.max(renderInfo.middlewareIndex + 1, 0), renderInfo.request.events.length - 1)
 		if (nextNth === renderInfo.middlewareIndex) eventPlaying = false;
 		else {
-			renderInfo.middlewareIndex = nextNth
-			await renderMiddleware()
-			await new Promise(r => setTimeout(r, animationDuration))
+			await changeMiddleware(nextNth);
+			await new Promise(r => setTimeout(r, animationDuration / 5))
 		}
 	}
 })
