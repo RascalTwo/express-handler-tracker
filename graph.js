@@ -1,15 +1,18 @@
 import { LAYOUTS } from './constants.js'
 
 import { generateStylesheet, renderStyleRules, updateStyles } from './style-rules.js'
-import { sourceLineToID, generateViewName, generateEventURLs, generateEventCodeHTML, generateEventLabel, generateProxyCallLabel, generateURL, generateHighlightedCode } from './helpers.js'
+import { sourceLineToID, generateViewName, generateEventURLs, generateEventCodeHTML, generateEventLabel, generateProxyCallLabel, generateURL, generateHighlightedCode, locations, importData, generateElements } from './helpers.js'
 import { setupEventSource } from './sse.js';
 
 import { animationDuration } from './animation-duration.js';
 
 import './theme.js';
 
-import { modules, root, views, requests, renderInfo, VERSION, isOffline, filepathPrefix } from './globals.js'
+import { requests, renderInfo, viewInfo, isOffline } from './globals.js'
 import { generateLinkedSVG } from './svg.js';
+
+import './backend.js'
+import { selfId, upsertData } from './backend.js';
 
 marked.setOptions({
 	highlight(code, language){
@@ -65,61 +68,6 @@ if (!isOffline) setupEventSource(requests, () => {
 	renderMiddlewaresSelect();
 })
 
-
-function generateElements() {
-	const parents = {};
-	const elements = modules.map(mod => {
-		const parentNames = mod.source.split('/').slice(0, -1).reverse()
-		for (let i = 0; i < parentNames.length; i++) {
-			const current = parentNames[i];
-			const next = parentNames[i + 1];
-			if (!(current in parentNames)) parents[current] = { data: { id: current, label: current, parent: next }, classes: 'group parent-' + current }
-		}
-		const label = mod.source.split('/').at(-1)
-		return {
-			data: { id: mod.source, parent: compoundNodes ? parentNames[0] : undefined, label, baseLabel: label, href: generateURL(root, mod.source) },
-			classes: parentNames[0] ? 'parent-' + parentNames[0] : undefined
-		}
-	})
-	for (const mod of modules) {
-		for (const dep of mod.dependencies) {
-			elements.push({
-				data: {
-					id: `${mod.source}-${dep}`,
-					source: mod.source,
-					target: dep,
-					arrow: 'triangle',
-				}
-			})
-		}
-	}
-	const foundViews = {}
-	for (const req of Object.values(requests)) {
-		for (const event of req.events) {
-			if (event.type === 'view') {
-				const caller = event.evaluate.line && sourceLineToID(elements, event.evaluate.line)
-				const label = generateViewName(event.name)
-				const id = views.directory + '/' + label
-				foundViews[event.name] = {
-					data: { id, label, baseLabel: label, parent: compoundNodes && views.directory },
-					classes: 'parent-' + views.directory
-				}
-				if (caller) {
-					elements.push({ data: { id: `${caller.data.id}-${id}`, source: caller.data.id, target: id, arrow: 'triangle' }, classes: 'group' })
-				}
-			}
-		}
-	}
-	if (Object.values(foundViews).length) {
-		elements.push(...Object.values(foundViews))
-		if (compoundNodes) elements.push({ data: { id: views.directory, label: views.directory }, classes: `parent-${views.directory} group` })
-	}
-	if (compoundNodes) elements.push(...Object.values(parents))
-	return elements;
-}
-
-
-
 window.cy = cytoscape({
 	container: document.getElementById('cy-div'),
 	elements: generateElements(),
@@ -143,15 +91,6 @@ cy.on('dbltap', 'node', function () {
 	if (url.includes('http')) window.open(url, '_blank');
 	else window.location.href = url;
 });
-const locations = (() => {
-	const locs = JSON.parse(localStorage.getItem('locations') || '{}');
-	return {
-		update(id, newLoc) {
-			locs[id] = newLoc
-			localStorage.setItem('locations', JSON.stringify(locs))
-		}
-	}
-})();
 cy.on('free', function ({ target }) {
 	locations.update(target.data('id'), target.position())
 });
@@ -194,7 +133,7 @@ function renderBubbles() {
 	const ids = new Set();
 	for (const event of renderInfo.request.events) {
 		const urls = generateEventURLs(event)
-		const remaining = [...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse(), ...(event.type === 'view' ? [views.directory + '/' + generateViewName(event.name)] : [])];
+		const remaining = [...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse(), ...(event.type === 'view' ? [viewInfo.views.directory + '/' + generateViewName(event.name)] : [])];
 
 		for (const url of remaining) {
 			const target = sourceLineToID(Object.values(cy.elements()).map(cye => {
@@ -281,7 +220,7 @@ function renderWindow(id, { title, body }, ...buttons) {
 	updateWindowHTML(window, body, title, {
 		innerHTML: '🗖',
 		onclick: () => maximizeMinimizeToggle(window)
-	}, ...buttons)
+	}, ...buttons.filter(Boolean))
 }
 
 for (let i = 1; i <= 7; i++){
@@ -313,7 +252,7 @@ function generateEventNodes(event, forward) {
 	const nodes = [];
 
 	const urls = generateEventURLs(event, false)
-	const remaining = [...(event.type === 'view' ? [views.directory + '/' + generateViewName(event.name)] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.replace(filepathPrefix, '')).reverse()];
+	const remaining = [...(event.type === 'view' ? [viewInfo.views.directory + '/' + generateViewName(event.name)] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.replace(viewInfo.filepathPrefix, '')).reverse()];
 	if (!forward) remaining.reverse();
 
 	while (remaining.length) {
@@ -352,13 +291,35 @@ async function jumpToAnnotatedEvent(change){
 		found = i;
 		break;
 	}
-	if (found === null) return;
+	if (found === null) return false;
 	while (renderInfo.middlewareIndex !== found) {
 		renderInfo.middlewareIndex += change;
 		await renderMiddleware()
-		await new Promise(r => setTimeout(r, 100));
+		await new Promise(r => setTimeout(r, animationDuration));
 	}
+	return true;
 }
+
+let annotationPlaying = false;
+
+document.querySelector('#footer-prev-annotation').addEventListener('click', () => jumpToAnnotatedEvent(-1))
+document.querySelector('#footer-pause-annotation').addEventListener('click', () => {
+	annotationPlaying = false;
+})
+document.querySelector('#footer-play-annotation').addEventListener('click', async () => {
+	if (annotationPlaying) return;
+	annotationPlaying = true;
+	while (annotationPlaying){
+		annotationPlaying = await jumpToAnnotatedEvent(1);
+		await new Promise(r => setTimeout(r, animationDuration))
+	}
+})
+document.querySelector('#footer-next-annotation').addEventListener('click', () => jumpToAnnotatedEvent(1))
+
+const editJSONButton = (getJSON, submitJSON) => ({
+	innerHTML: 'Edit',
+	onclick: () => openJSONEditorModal(getJSON, submitJSON)
+})
 
 async function renderMiddleware() {
 	if (!renderInfo.request) return
@@ -370,7 +331,7 @@ async function renderMiddleware() {
 	document.querySelector('meter').value = duration
 	document.querySelector('#meter-wrapper').childNodes[0].nodeValue = (+duration.toFixed(0)).toLocaleString() + 'ms'
 	document.querySelector('progress').value = renderInfo.middlewareIndex + 1
-	document.querySelector('#progress-wrapper').childNodes[0].nodeValue = renderInfo.middlewareIndex + 1
+	document.querySelector('#progress-wrapper').childNodes[4].nodeValue = renderInfo.middlewareIndex + 1
 	if (event.diffs) {
 		for (const [i, key] of ['request', 'response'].entries()){
 			if (!event.diffs[key]) {
@@ -386,34 +347,100 @@ async function renderMiddleware() {
 				else try { jsondiffpatch.patch(original, deserialize(serialize(delta)))}
 				catch(e) { console.error(e, original, delta, e) }
 			}
-			renderWindow(i + 1, { title: key[0].toUpperCase() + key.slice(1), body: {type: 'diff', data: { original, delta: event.diffs[key] } } });
+			renderWindow(
+				i + 1,
+				{ title: key[0].toUpperCase() + key.slice(1), body: { type: 'diff', data: { original, delta: event.diffs[key] } } },
+				editJSONButton(() => event.diffs[key], (_, newJSON) => {
+					event.diffs[key] = newJSON
+					renderMiddleware();
+					updateEvent(renderInfo.request.id, event.start, { diffs: event.diffs })
+				})
+			);
 		}
 	} else if (event.type === 'redirect') {
 		renderWindow(1, { body: '' })
 		renderWindow(2, { title: 'Redirected', body: event.path })
 	} else if (event.type === 'view') {
 		renderWindow(1, { body: '' })
-		renderWindow(2, { title: event.name + ' view', body: { type: 'code', string: event.locals ? JSON.stringify(event.locals, undefined, '  ') : '{}' } });
+		renderWindow(
+			2,
+			{ title: event.name + ' view', body: { type: 'code', string: event.locals ? JSON.stringify(event.locals, undefined, '  ') : '{}' } },
+			editJSONButton(() => event.locals, (_, newLocals) => {
+				event.locals = newLocals;
+				renderMiddleware()
+				updateEvent(renderInfo.request.id, event.start, { locals: event.locals })
+			})
+		);
 	} else if (event.type === 'send') {
 		renderWindow(1, { body: '' })
-		renderWindow(2, { title: 'Response Body', body: { type: 'code', string: event.body } });
+		renderWindow(
+			2,
+			{ title: 'Response Body', body: { type: 'code', string: event.body } },
+			{
+				innerHTML: 'Edit',
+				onclick: () => openTextModal(() => event.body || '', (_, newBody) => {
+					event.body = newBody;
+					renderMiddleware();
+					updateEvent(renderInfo.request.id, event.start, { body: event.body })
+				}, 'Set Body', 'Set')
+			}
+		);
 	} else if (event.type === 'json') {
 		renderWindow(1, { body: '' })
-		renderWindow(2, { title: 'Response JSON', body: event.body });
+		renderWindow(
+			2,
+			{ title: 'Response JSON', body: { type: 'code', string: JSON.stringify(event.json, undefined, '  ') } },
+			editJSONButton(() => event.json, (_, newJSON) => {
+				event.json = newJSON
+				renderMiddleware()
+				updateEvent(renderInfo.request.id, event.start, { json: event.json })
+			})
+		);
 	} else if (event.type === 'proxy-evaluate') {
-		renderWindow(1, event.args?.string ? { title: 'Arguments', body: generateProxyCallLabel(event, event.args.string.slice(1, -1)) } : { body: '' })
-		renderWindow(2, { title: 'Result', body: event.reason || event.value || '' });
+		if (event.args?.string) renderWindow(1, { title: 'Arguments', body: { type: 'code', string: generateProxyCallLabel(event, event.args.string.slice(1, -1)) } },
+		{
+			innerHTML: 'Edit',
+			onclick: () => openTextModal(() => event.args.string.slice(1, -1), (_, newArgsString) => {
+				event.args.string = '[' + newArgsString + ']'
+				renderMiddleware();
+				updateEvent(renderInfo.request.id, event.start, { args: event.args })
+			}, 'Set Arguments', 'Set')
+		})
+		else renderWindow(1, { body: '' })
+		renderWindow(
+			2,
+			{ title: 'Result', body: { type: 'code', string: event.reason || event.value || '' } },
+			event.reason || event.value ? {
+				innerHTML: 'Edit',
+				onclick: () => openTextModal(() => event.reason || event.value, (_, newThing) => {
+					if (event.reason) event.reason = newThing;
+					else event.value = newThing;
+					updateEvent(renderInfo.request.id, event.start, { reason: event.reason, value: event.value })
+					renderMiddleware();
+				}, 'Set Result', 'Set')
+			} : undefined
+		);
 	}
 	renderWindow(7, {
 		title: 'Annotation',
-		body: { type: 'markdown', string: event.annotation || '' } },
+		body: { type: 'markdown', string: event.annotation || '' }
+	},
 		{
 			innerHTML: 'Previous',
 			onclick: () => jumpToAnnotatedEvent(-1)
 		},
 		{
 			innerHTML: 'Edit',
-			onclick: () => openMarkdownModal(renderInfo.request.id, event.start, event.annotation || '# Markdown-Powered!')
+			onclick: () => openTextModal(() => event.annotation || '# Markdown-Powered!', (_, newAnnotation) => {
+				if (!newAnnotation) {
+					if (event.annotation === undefined) return
+					delete event.annotation
+				} else {
+					event.annotation = newAnnotation;
+				}
+				renderMiddleware();
+				updateEvent(renderInfo.request.id, event.start, { annotation: newAnnotation });
+			}, 'Set Annotation Markdown', 'Set')
 		},
 		{
 			innerHTML: 'Next',
@@ -422,7 +449,7 @@ async function renderMiddleware() {
 	);
 
 	const urls = generateEventURLs(event)
-	const remaining = [...(event.type === 'view' ? [views.directory + '/' + generateViewName(event.name)] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse()];
+	const remaining = [...(event.type === 'view' ? [viewInfo.views.directory + '/' + generateViewName(event.name)] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse()];
 	if (!renderInfo.forward) remaining.reverse()
 
 	const w5 = document.querySelector('#window5 pre')
@@ -439,10 +466,11 @@ async function renderMiddleware() {
 
 	const remainingNodes = generateEventNodes(event, renderInfo.forward).reverse()
 
-	if (!remainingNodes.length) remainingNodes.push(renderInfo.lastNode)
+	if (!remainingNodes.length && renderInfo.lastNode) remainingNodes.push(renderInfo.lastNode)
+	if (!remainingNodes.length) remainingNodes.push(cy.nodes()[0])
 
 	disableButtons()
-	await new Promise(r => setTimeout(r, 100));
+	await new Promise(r => setTimeout(r, animationDuration));
 	while (remainingNodes.length) {
 		const target = remainingNodes.pop()
 
@@ -509,7 +537,7 @@ async function renderMiddleware() {
 		}
 		renderInfo.tip.show();
 	}
-	setTimeout(() => enableButtons(), 100);
+	setTimeout(() => enableButtons(), animationDuration);
 }
 
 const requestSelect = document.querySelector('#requests');
@@ -544,22 +572,34 @@ function deleteRequest(id){
 	renderMiddlewaresSelect()
 	renderRequest()
 	renderMiddleware()
-	fetch('../delete-request/' + request.id).catch(console.error);
+	fetch('./delete-request/' + request.id).catch(console.error);
 }
 
 document.querySelector('#delete-request').addEventListener('click', () => {
 	if (renderInfo.request) deleteRequest(renderInfo.request.id);
 })
 
+document.querySelector('#delete-event').addEventListener('click', () => {
+	const request = renderInfo.request;
+	const event = request.events[renderInfo.middlewareIndex]
+	request.events.splice(renderInfo.middlewareIndex, 1)
+	renderInfo.middlewareIndex = Math.max(0, renderInfo.middlewareIndex - 1)
+	document.querySelector('#events').value = request.events[renderInfo.middlewareIndex].start
+	renderMiddlewaresSelect()
+	renderMiddleware()
+	fetch('./delete-event/' + request.id + '/' + event.start, { method: 'DELETE' }).catch(console.error);
+})
+
 
 function changeMiddleware(nth) {
-	if (renderInfo.animating) return
+	if (renderInfo.animating) return false
 	let oldNth = renderInfo.middlewareIndex;
 	renderInfo.middlewareIndex = nth;
 	renderInfo.forward = renderInfo.middlewareIndex > oldNth;
 	renderMiddleware();
 
 	document.querySelector('#events').selectedOptions[0]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
+	return true;
 }
 
 document.querySelector('#events').addEventListener('change', e => {
@@ -591,7 +631,7 @@ function renderMiddlewaresSelect() {
 	document.querySelector('meter').value = 0;
 	document.querySelector('meter').max = duration;
 
-	document.querySelector('#progress-wrapper').childNodes[2].nodeValue = renderInfo.request.events.length
+	document.querySelector('#progress-wrapper').childNodes[6].nodeValue = renderInfo.request.events.length
 	document.querySelector('progress').max = renderInfo.request.events.length;
 }
 
@@ -697,7 +737,7 @@ function renderCodeTooltips() {
 
 	let i = 0;
 
-	for (const [ei, e] of renderInfo.request.events.entries()) {
+	for (const [ei, e] of renderInfo.request?.events.entries() || []) {
 		const label = generateEventLabel(e);
 		const urls = generateEventURLs(e)
 		const allCodes = generateHighlightedCode(e)
@@ -859,7 +899,7 @@ function enableButtons() {
 }
 function disableButtons() {
 	renderInfo.animating = true;
-	document.querySelectorAll('input, textarea, button, select').forEach(b => b.disabled = true)
+	document.querySelectorAll('input, textarea, button:not([id^="footer-pause"]), select').forEach(b => b.disabled = true)
 }
 
 renderRequest()
@@ -880,13 +920,33 @@ window.addEventListener('keydown', ({ target, key }) => {
 			break
 	}
 });
+let eventPlaying = false;
+document.querySelector('#footer-pause-event').addEventListener('click', () => {
+	eventPlaying = false;
+})
+document.querySelector('#footer-play-event').addEventListener('click', async () => {
+	if (eventPlaying) return;
+	eventPlaying = true;
+	while (eventPlaying){
+		let nextNth = Math.min(Math.max(renderInfo.middlewareIndex + 1, 0), renderInfo.request.events.length - 1)
+		if (nextNth === renderInfo.middlewareIndex) eventPlaying = false;
+		else {
+			renderInfo.middlewareIndex = nextNth
+			await renderMiddleware()
+			await new Promise(r => setTimeout(r, animationDuration))
+		}
+	}
+})
+document.querySelector('#footer-prev-event').addEventListener('click', () => changeMiddleware(Math.min(Math.max(renderInfo.middlewareIndex - 1, 0), renderInfo.request.events.length - 1)))
+
+document.querySelector('#footer-next-event').addEventListener('click', () => changeMiddleware(Math.min(Math.max(renderInfo.middlewareIndex + 1, 0), renderInfo.request.events.length - 1)))
 
 function updateRequestInfo(request, updates){
-	fetch('../update-request/' + request.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+	fetch('./update-request/' + request.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
 }
 
-function updateAnnotation(requestId, eventStart, updates){
-	fetch('../update-event/' + requestId + '/' + eventStart, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+function updateEvent(requestId, eventStart, updates) {
+	fetch('./update-event/' + requestId + '/' + eventStart, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
 }
 
 function downloadBlob(blob, filename){
@@ -923,7 +983,7 @@ document.querySelector('#save-as-svg').addEventListener('click', () => {
 		full: true
 	})
 	svgWindow.document.body.innerHTML = rawSVG;
-	svgWindow.document.body.innerHTML = generateLinkedSVG(svgWindow.document.body.children[0], document.querySelector('#root-input').value || root);
+	svgWindow.document.body.innerHTML = generateLinkedSVG(svgWindow.document.body.children[0], document.querySelector('#root-input').value || viewInfo.root);
 
 	const linkedSVG = svgWindow.document.body.innerHTML;
 
@@ -933,15 +993,17 @@ document.querySelector('#save-as-svg').addEventListener('click', () => {
 	svgWindow.document.body.appendChild(downloadBtn);
 });
 
-const openMarkdownModal = (() => {
+const openTextModal = (() => {
 	const checkbox = document.querySelector('#modal-3');
 	const modal = checkbox.nextElementSibling;
 
-	let info = {};
+	const info = {};
 
-	const openMarkdownModal = (requestId, eventStart, initialText) => {
-		Object.assign(info, { requestId, eventStart })
-		modal.elements[0].value = initialText
+	const openTextModal = (getText, submitText, title, button) => {
+		Object.assign(info, { getText, submitText })
+		modal.elements[0].value = getText()
+		modal.querySelector('.modal-title').textContent = title;
+		modal.querySelector('button').textContent = button;
 		checkbox.checked = true;
 		modal.elements[0].focus()
 	}
@@ -949,19 +1011,37 @@ const openMarkdownModal = (() => {
 	modal.addEventListener('submit', e => {
 		e.preventDefault()
 
-		const newAnnotation = modal.elements[0].value;
-		const event = requests[info.requestId].events.find(e => e.start === info.eventStart);
-		if (!newAnnotation) {
-			if (event.annotation === undefined) return
-			delete event.annotation
-		}
-		event.annotation = newAnnotation;
-		updateAnnotation(info.requestId, event.start, { annotation: newAnnotation });
-		renderMiddleware();
+		info.submitText(info.getText(), modal.elements[0].value)
 		checkbox.checked = false;
 	})
 
-	return openMarkdownModal;
+	return openTextModal;
+})();
+
+const openJSONEditorModal = (() => {
+	const checkbox = document.querySelector('#modal-4');
+	const modal = checkbox.nextElementSibling;
+
+	const editor = new JSONEditor(modal.querySelector('#jsoneditor'), {
+		mode: 'code'
+	});
+
+	const info = {};
+
+	const openJSONEditorModal = (getInitialJSON, submitJSON) => {
+		Object.assign(info, { getInitialJSON, submitJSON })
+		editor.set(getInitialJSON())
+		checkbox.checked = true;
+	}
+
+	modal.addEventListener('submit', e => {
+		e.preventDefault()
+
+		info.submitJSON(info.getInitialJSON(), editor.get());
+		checkbox.checked = false;
+	})
+
+	return openJSONEditorModal;
 })();
 
 (() => {
@@ -983,6 +1063,12 @@ const openMarkdownModal = (() => {
 		downloadBlob(new Blob([JSON.stringify(serialize(getData(), { json: true }))], { type: 'application/json' }), 'data.json');
 	});
 
+	const uploadBtn = document.querySelector('#upload-export-button')
+	if (!selfId) uploadBtn.disabled = true;
+	else uploadBtn.addEventListener('click', () => {
+		upsertData(getData()).then(() => checkbox.checked = false)
+	})
+
 	document.querySelector('#all-button').addEventListener('click', () => {
 		const checkboxes = [...modal.querySelectorAll('ul input[type="checkbox"]')]
 		const newValue = !checkboxes.every(c => c.checked)
@@ -999,7 +1085,13 @@ const openMarkdownModal = (() => {
 
 	function getData() {
 		const data = {
-			version: VERSION,
+			external: {
+				slug: document.querySelector('#slug-export-input').value,
+				owner: document.querySelector('#owner-export-input').value,
+				repository: document.querySelector('#repository-export-input').value,
+				authorId: selfId
+			},
+			version: viewInfo.VERSION,
 			paths: {
 				root: document.querySelector('#root-input').value,
 				views: {
@@ -1010,7 +1102,7 @@ const openMarkdownModal = (() => {
 		}
 		if (modal.querySelector('#layout-windows-checkbox').checked) data.windows = Array.from({ length: 7 }, (_, i) => localStorage.getItem('window' + (i + 1) + '-style'))
 		if (modal.querySelector('#layout-graph-checkbox').checked) data.graph = {
-			modules,
+			modules: viewInfo.modules,
 			positions: cy.nodes().reduce((locs, n) => ({ ...locs, [n.id()]: n.position() }), {}),
 			zoom: cy.zoom(),
 			pan: cy.pan()
@@ -1078,9 +1170,9 @@ const openMarkdownModal = (() => {
 		modal.reset()
 
 
-		document.querySelector('#root-input').value = root;
-		document.querySelector('#views-directory-input').value = views.directory;
-		document.querySelector('#views-extension-input').value = views.extension;
+		document.querySelector('#root-input').value = viewInfo.root;
+		document.querySelector('#views-directory-input').value = viewInfo.views.directory;
+		document.querySelector('#views-extension-input').value = viewInfo.views.extension;
 
 		const datalist = document.querySelector('#export-data-datalist')
 		datalist.innerHTML = '';
@@ -1116,57 +1208,14 @@ const openMarkdownModal = (() => {
 		if (inputs[1].value) text = inputs[1].value;
 		if (inputs[2].value) text = localStorage.getItem('saved-requests-' + localName);
 
-		const { windows, graph, styleRules, layoutValues, requests: newRequests, paths, VERSION } = deserialize(JSON.parse(text))
-		if (windows) {
-			for (let i = 0; i < windows.length; i++) {
-				localStorage.setItem('window' + (i + 1) + '-style', windows[i])
-			}
-			renderInitialWindows();
-		}
-		if (newRequests){
-			localStorage.setItem('importing-requests', JSON.stringify(serialize(newRequests)))
-			for (const key in requests) {
-				delete requests[key];
-			}
-			Object.assign(requests, newRequests)
-			renderInfo.request = Object.values(requests)[0]
-			renderInfo.middlewareIndex = 0;
-			renderRequestsSelect();
-			renderMiddlewaresSelect();
-			renderRequest();
-		}
-		if (graph) {
-			modules.splice(0, modules.length)
-			modules.push(...graph.modules)
-			cy.json({ elements: generateElements() })
-			for (const [id, { x, y }] of Object.entries(graph.positions).sort((a, b) => a[0].split('/').length - b[0].split('/').length)) {
-				cy.$(`[id="${id}"]`)?.position({ x, y })
-				locations.update(id, { x, y })
-			}
-			cy.zoom(graph.zoom)
-			cy.pan(graph.pan)
-			localStorage.setItem('info', JSON.stringify({ zoom: graph.zoom, pan: graph.pan }));
-		}
-		if (styleRules) {
-			localStorage.setItem('style-rules', JSON.stringify(styleRules))
-		}
-		if (layoutValues){
-			document.querySelector('#layout-options').value = layoutValues['layout-options'];
-			document.querySelector('#animation-duration').value = layoutValues['animation-duration'];
-			document.querySelector('#allEdges').checked = layoutValues.allEdges;
-			document.querySelector('#eventNumbers').checked = layoutValues.eventNumbers;
-			document.querySelector('#allNodes').checked = layoutValues.allNodes;
-			document.querySelector('#darkTheme').checked = layoutValues.darkTheme;
-			document.querySelector('#eventHighlights').checked = layoutValues.eventHighlights;
-			document.querySelector('#codeTooltips').checked = layoutValues.codeTooltips;
-		}
-		localStorage.setItem('importing-info', JSON.stringify({
-			...paths,
-			VERSION,
-			modules: graph?.modules || []
-		}))
+		importData(deserialize(JSON.parse(text)), cy)
+		renderInitialWindows();
+		renderRequestsSelect();
+		renderMiddlewaresSelect();
+		renderRequest();
 		renderStyleRules();
 		updateStyles();
+		checkbox.checked = false;
 	})
 
 	const select = document.querySelector('#import-data-select')

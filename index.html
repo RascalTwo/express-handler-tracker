@@ -5,6 +5,7 @@
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<title>Express Handler Tracker - Request Network Graph</title>
+		<link rel="icon" href="data:,">
 
 		<link rel="stylesheet" href="paper.min.css" />
 
@@ -46,12 +47,16 @@
 		<link rel="stylesheet" href="library/jsondiffpatch/html.css" type="text/css" />
 		<script src="library/cytoscape-svg.js"></script>
 		<script src="library/marked.min.js" integrity="sha512-DZIC9m2IbFlio5GE2oKD6/veW6NXML5Cbo9FHnba7Q9R4OCPelWw9R5QpupcPPLSv0euhuRr+5JV5pWl3X3nSg==" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+		<script src="library/jsoneditor.min.js" crossorigin="anonymous" referrerpolicy="no-referrer"></script>
+		<link rel="stylesheet" href="library/jsoneditor.css" crossorigin="anonymous" referrerpolicy="no-referrer" />
 	</head>
 
 	<body>
 		<div id="cy-div"></div>
 
 		<span id="tooltippy"></span>
+
+		<button id="auth-button"><img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" /></button>
 
 		<div class="windowGroup">
 			<div id="window1" class="window black fade small">
@@ -106,7 +111,7 @@
 									Event Numbers
 								</label>
 								<label class="paper-switch">
-									<input id="eventNumbers" name="eventNumbers" type="checkbox" checked />
+									<input id="eventNumbers" name="eventNumbers" type="checkbox" />
 									<span class="paper-switch-slider"></span>
 								</label>
 							</span>
@@ -148,7 +153,7 @@
 									Code Tooltips
 								</label>
 								<label class="paper-switch">
-									<input id="codeTooltips" name="codeTooltips" type="checkbox" checked />
+									<input id="codeTooltips" name="codeTooltips" type="checkbox" />
 									<span class="paper-switch-slider"></span>
 								</label>
 							</span>
@@ -191,7 +196,7 @@
 						<div><select id="requests"></select><button id="delete-request">Delete</button></div>
 
 						<label id="event-small"></label>
-						<select id="events" multiple>Events</select>
+						<div><select id="events" multiple>Events</select><button id="delete-event">Delete</button></div>
 					</div>
 				</div>
 			</div>
@@ -230,7 +235,11 @@
 			<button id="button4">Events</button>
 			<button id="button1">Request</button>
 			<button id="button2">Response</button>
+			<button id="footer-prev-annotation">⏪</button>
+			<button id="footer-pause-annotation">⏸</button>
 			<button id="button7">Annotation</button>
+			<button id="footer-play-annotation">▶</button>
+			<button id="footer-next-annotation">⏩</button>
 			<button id="button5">Current Code</button>
 			<button id="button6">All Code</button>
 			<span id="meter-wrapper">
@@ -241,9 +250,13 @@
 			<button id="reset-windows">Reset Windows</button>
 			<button id="reset-all">Reset All</button>
 			<span id="progress-wrapper">
+				<button id="footer-prev-event">⏪</button>
+				<button id="footer-pause-event">⏸</button>
 				1
 				<progress min="1" max="10" value="5">5/10</progress>
 				10
+				<button id="footer-play-event">▶</button>
+				<button id="footer-next-event">⏩</button>
 			</span>
 		</footer>
 
@@ -281,6 +294,18 @@
 						<label for="views-extension-input">Views Extension</label>
 						<input id="views-extension-input">
 					</div>
+				</fieldset>
+				<fieldset>
+					<legend>Cloud</legend>
+					<label for="slug-export-input">Slug</label>
+					<input id="slug-export-input" required>
+					in
+					<label for="owner-export-input">Owner</label>
+					<input id="owner-export-input" required>
+					in
+					<label for="repository-export-input">Repository</label>
+					<input id="repository-export-input" required>
+					<button id="upload-export-button" type="button">Upload</button>
 				</fieldset>
 				<button type="button" id="download-data">Download</button>
 				<button type="button" id="copy-data">Copy</button>
@@ -320,6 +345,11 @@
 					<label for="import-data-select">Local Storage</label>
 					<div class="form-group"><select id="import-data-select"></select></div>
 				</div>
+				<fieldset>
+					<legend>Cloud</legend>
+					<ul>
+					</ul>
+				</fieldset>
 				<button>Import</button>
 			</div>
 		</form>
@@ -332,6 +362,32 @@
 				<h4 class="modal-title">Set Annotation Markdown</h4>
 				<textarea autocomplete="off"></textarea>
 				<button>Set</button>
+			</div>
+		</form>
+
+		<input class="modal-state" id="modal-4" type="checkbox" autocomplete="off">
+		<form class="modal">
+			<label class="modal-bg" for="modal-4"></label>
+			<div class="modal-body">
+				<label class="btn-close" for="modal-4">X</label>
+				<h4 class="modal-title">Update JSON</h4>
+				<div id="jsoneditor"></div>
+				<button>Update</button>
+			</div>
+		</form>
+
+		<input class="modal-state" id="modal-5" type="checkbox" autocomplete="off">
+		<form class="modal">
+			<label class="modal-bg" for="modal-5"></label>
+			<div class="modal-body">
+				<label class="btn-close" for="modal-5">X</label>
+				<h4 class="modal-title">Exported</h4>
+
+				<ul>
+					<li></li>
+				</ul>
+
+				<button>Logout</button>
 			</div>
 		</form>
 
