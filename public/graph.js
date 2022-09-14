@@ -1,7 +1,7 @@
 import { LAYOUTS } from './constants.js'
 
 import { generateStylesheet, renderStyleRules, updateStyles } from './style-rules.js'
-import { sourceLineToID, generateViewName, generateEventURLs, generateEventCodeHTML, generateEventLabel, generateProxyCallLabel, generateURL, generateHighlightedCode } from './helpers.js'
+import { sourceLineToID, generateViewName, generateEventURLs, generateEventCodeHTML, generateEventLabel, generateProxyCallLabel, generateURL, generateHighlightedCode, locations, importData, generateElements } from './helpers.js'
 import { setupEventSource } from './sse.js';
 
 import { animationDuration } from './animation-duration.js';
@@ -10,6 +10,9 @@ import './theme.js';
 
 import { requests, renderInfo, viewInfo, isOffline } from './globals.js'
 import { generateLinkedSVG } from './svg.js';
+
+import './backend.js'
+import { selfId, upsertData } from './backend.js';
 
 marked.setOptions({
 	highlight(code, language){
@@ -65,61 +68,6 @@ if (!isOffline) setupEventSource(requests, () => {
 	renderMiddlewaresSelect();
 })
 
-
-function generateElements() {
-	const parents = {};
-	const elements = viewInfo.modules.map(mod => {
-		const parentNames = mod.source.split('/').slice(0, -1).reverse()
-		for (let i = 0; i < parentNames.length; i++) {
-			const current = parentNames[i];
-			const next = parentNames[i + 1];
-			if (!(current in parentNames)) parents[current] = { data: { id: current, label: current, parent: next }, classes: 'group parent-' + current }
-		}
-		const label = mod.source.split('/').at(-1)
-		return {
-			data: { id: mod.source, parent: compoundNodes ? parentNames[0] : undefined, label, baseLabel: label, href: generateURL(viewInfo.root, mod.source) },
-			classes: parentNames[0] ? 'parent-' + parentNames[0] : undefined
-		}
-	})
-	for (const mod of viewInfo.modules) {
-		for (const dep of mod.dependencies) {
-			elements.push({
-				data: {
-					id: `${mod.source}-${dep}`,
-					source: mod.source,
-					target: dep,
-					arrow: 'triangle',
-				}
-			})
-		}
-	}
-	const foundViews = {}
-	for (const req of Object.values(requests)) {
-		for (const event of req.events) {
-			if (event.type === 'view') {
-				const caller = event.evaluate.line && sourceLineToID(elements, event.evaluate.line)
-				const label = generateViewName(event.name)
-				const id = viewInfo.views.directory + '/' + label
-				foundViews[event.name] = {
-					data: { id, label, baseLabel: label, parent: compoundNodes && viewInfo.views.directory },
-					classes: 'parent-' + viewInfo.views.directory
-				}
-				if (caller) {
-					elements.push({ data: { id: `${caller.data.id}-${id}`, source: caller.data.id, target: id, arrow: 'triangle' }, classes: 'group' })
-				}
-			}
-		}
-	}
-	if (Object.values(foundViews).length) {
-		elements.push(...Object.values(foundViews))
-		if (compoundNodes) elements.push({ data: { id: viewInfo.views.directory, label: viewInfo.views.directory }, classes: `parent-${viewInfo.views.directory} group` })
-	}
-	if (compoundNodes) elements.push(...Object.values(parents))
-	return elements;
-}
-
-
-
 window.cy = cytoscape({
 	container: document.getElementById('cy-div'),
 	elements: generateElements(),
@@ -143,15 +91,6 @@ cy.on('dbltap', 'node', function () {
 	if (url.includes('http')) window.open(url, '_blank');
 	else window.location.href = url;
 });
-const locations = (() => {
-	const locs = JSON.parse(localStorage.getItem('locations') || '{}');
-	return {
-		update(id, newLoc) {
-			locs[id] = newLoc
-			localStorage.setItem('locations', JSON.stringify(locs))
-		}
-	}
-})();
 cy.on('free', function ({ target }) {
 	locations.update(target.data('id'), target.position())
 });
@@ -1124,6 +1063,12 @@ const openJSONEditorModal = (() => {
 		downloadBlob(new Blob([JSON.stringify(serialize(getData(), { json: true }))], { type: 'application/json' }), 'data.json');
 	});
 
+	const uploadBtn = document.querySelector('#upload-export-button')
+	if (!selfId) uploadBtn.disabled = true;
+	else uploadBtn.addEventListener('click', () => {
+		upsertData(getData()).then(() => checkbox.checked = false)
+	})
+
 	document.querySelector('#all-button').addEventListener('click', () => {
 		const checkboxes = [...modal.querySelectorAll('ul input[type="checkbox"]')]
 		const newValue = !checkboxes.every(c => c.checked)
@@ -1140,6 +1085,12 @@ const openJSONEditorModal = (() => {
 
 	function getData() {
 		const data = {
+			external: {
+				slug: document.querySelector('#slug-export-input').value,
+				owner: document.querySelector('#owner-export-input').value,
+				repository: document.querySelector('#repository-export-input').value,
+				authorId: selfId
+			},
 			version: viewInfo.VERSION,
 			paths: {
 				root: document.querySelector('#root-input').value,
@@ -1151,7 +1102,7 @@ const openJSONEditorModal = (() => {
 		}
 		if (modal.querySelector('#layout-windows-checkbox').checked) data.windows = Array.from({ length: 7 }, (_, i) => localStorage.getItem('window' + (i + 1) + '-style'))
 		if (modal.querySelector('#layout-graph-checkbox').checked) data.graph = {
-			modules,
+			modules: viewInfo.modules,
 			positions: cy.nodes().reduce((locs, n) => ({ ...locs, [n.id()]: n.position() }), {}),
 			zoom: cy.zoom(),
 			pan: cy.pan()
@@ -1257,60 +1208,14 @@ const openJSONEditorModal = (() => {
 		if (inputs[1].value) text = inputs[1].value;
 		if (inputs[2].value) text = localStorage.getItem('saved-requests-' + localName);
 
-		const { windows, graph, styleRules, layoutValues, requests: newRequests, paths, VERSION } = deserialize(JSON.parse(text))
-		if (windows) {
-			for (let i = 0; i < windows.length; i++) {
-				localStorage.setItem('window' + (i + 1) + '-style', windows[i])
-			}
-			renderInitialWindows();
-		}
-		if (newRequests){
-			localStorage.setItem('importing-requests', JSON.stringify(serialize(newRequests)))
-			for (const key in requests) {
-				delete requests[key];
-			}
-			Object.assign(requests, newRequests)
-			renderInfo.request = Object.values(requests)[0]
-			renderInfo.middlewareIndex = 0;
-			renderRequestsSelect();
-			renderMiddlewaresSelect();
-			renderRequest();
-		}
-		if (graph) {
-			viewInfo.modules.splice(0, viewInfo.modules.length)
-			viewInfo.modules.push(...graph.viewInfo.modules)
-			cy.json({ elements: generateElements() })
-			for (const [id, { x, y }] of Object.entries(graph.positions).sort((a, b) => a[0].split('/').length - b[0].split('/').length)) {
-				cy.$(`[id="${id}"]`)?.position({ x, y })
-				locations.update(id, { x, y })
-			}
-			cy.zoom(graph.zoom)
-			cy.pan(graph.pan)
-			localStorage.setItem('info', JSON.stringify({ zoom: graph.zoom, pan: graph.pan }));
-		}
-		if (styleRules) {
-			localStorage.setItem('style-rules', JSON.stringify(styleRules))
-		}
-		if (layoutValues){
-			document.querySelector('#layout-options').value = layoutValues['layout-options'];
-			document.querySelector('#animation-duration').value = layoutValues['animation-duration'];
-			document.querySelector('#allEdges').checked = layoutValues.allEdges;
-			document.querySelector('#eventNumbers').checked = layoutValues.eventNumbers;
-			document.querySelector('#allNodes').checked = layoutValues.allNodes;
-			document.querySelector('#darkTheme').checked = layoutValues.darkTheme;
-			document.querySelector('#eventHighlights').checked = layoutValues.eventHighlights;
-			document.querySelector('#codeTooltips').checked = layoutValues.codeTooltips;
-		}
-		localStorage.setItem('importing-info', JSON.stringify({
-			...paths,
-			VERSION,
-			modules: graph?.modules || []
-		}))
-		viewInfo.root = paths.root;
-		viewInfo.views = paths.views;
-		if (graph?.modules) viewInfo.modules = graph.modules;
+		importData(deserialize(JSON.parse(text)), cy)
+		renderInitialWindows();
+		renderRequestsSelect();
+		renderMiddlewaresSelect();
+		renderRequest();
 		renderStyleRules();
 		updateStyles();
+		checkbox.checked = false;
 	})
 
 	const select = document.querySelector('#import-data-select')

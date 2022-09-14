@@ -5,6 +5,7 @@
 		<meta charset="UTF-8">
 		<meta name="viewport" content="width=device-width, initial-scale=1.0">
 		<title>Express Handler Tracker - Request Network Graph</title>
+		<link rel="icon" href="data:,">
 
 		<link rel="stylesheet" href="paper.min.css" />
 
@@ -54,6 +55,8 @@
 		<div id="cy-div"></div>
 
 		<span id="tooltippy"></span>
+
+		<button id="auth-button"><img src="https://github.githubassets.com/images/modules/logos_page/GitHub-Mark.png" /></button>
 
 		<div class="windowGroup">
 			<div id="window1" class="window black fade small">
@@ -292,6 +295,18 @@
 						<input id="views-extension-input">
 					</div>
 				</fieldset>
+				<fieldset>
+					<legend>Cloud</legend>
+					<label for="slug-export-input">Slug</label>
+					<input id="slug-export-input" required>
+					in
+					<label for="owner-export-input">Owner</label>
+					<input id="owner-export-input" required>
+					in
+					<label for="repository-export-input">Repository</label>
+					<input id="repository-export-input" required>
+					<button id="upload-export-button" type="button">Upload</button>
+				</fieldset>
 				<button type="button" id="download-data">Download</button>
 				<button type="button" id="copy-data">Copy</button>
 				<div class="form-group" autocomplete="off">
@@ -330,6 +345,11 @@
 					<label for="import-data-select">Local Storage</label>
 					<div class="form-group"><select id="import-data-select"></select></div>
 				</div>
+				<fieldset>
+					<legend>Cloud</legend>
+					<ul>
+					</ul>
+				</fieldset>
 				<button>Import</button>
 			</div>
 		</form>
@@ -353,6 +373,21 @@
 				<h4 class="modal-title">Update JSON</h4>
 				<div id="jsoneditor"></div>
 				<button>Update</button>
+			</div>
+		</form>
+
+		<input class="modal-state" id="modal-5" type="checkbox" autocomplete="off">
+		<form class="modal">
+			<label class="modal-bg" for="modal-5"></label>
+			<div class="modal-body">
+				<label class="btn-close" for="modal-5">X</label>
+				<h4 class="modal-title">Exported</h4>
+
+				<ul>
+					<li></li>
+				</ul>
+
+				<button>Logout</button>
 			</div>
 		</form>
 

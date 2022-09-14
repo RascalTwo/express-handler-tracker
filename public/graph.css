@@ -296,3 +296,11 @@ meter, progress {
 	min-width: 50vw;
 	min-height: 50vh;
 }
+
+#auth-button {
+	position: absolute;
+	top: 0;
+	left: 0;
+	width: 2rem;
+	padding: 0;
+}
