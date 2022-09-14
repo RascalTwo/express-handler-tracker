@@ -1,5 +1,5 @@
 
-export let isOffline = new URLSearchParams(window.location.search).has('offline');
+export let isOffline = !!(window.location.hash || window.location.search) || localStorage.getItem('importing-requests');
 
 export const requests = await (async () => {
 	const getLocalInfo = () => {

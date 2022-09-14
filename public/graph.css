@@ -151,6 +151,10 @@ option:checked {
 	background-color: red;
 }
 
+#connection-indicator[data-ready-state="offline"]{
+	background-color: white;
+}
+
 .hljs-ln tbody tr:first-child {
 	filter: brightness(62.5%);
 }
