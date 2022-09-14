@@ -308,8 +308,7 @@ async function jumpToAnnotatedEvent(change){
 	}
 	if (found === null) return false;
 	while (renderInfo.middlewareIndex !== found) {
-		renderInfo.middlewareIndex += change;
-		await renderMiddleware()
+		await changeMiddleware(renderInfo.middlewareIndex + change);
 		await new Promise(r => setTimeout(r, animationDuration / 5));
 	}
 	return true;
@@ -326,7 +325,7 @@ document.querySelector('#footer-play-annotation').addEventListener('click', asyn
 	annotationPlaying = true;
 	while (annotationPlaying){
 		annotationPlaying = await jumpToAnnotatedEvent(1);
-		await new Promise(r => setTimeout(r, animationDuration / 5))
+		await new Promise(r => setTimeout(r, animationDuration * 10))
 	}
 })
 document.querySelector('#footer-next-annotation').addEventListener('click', () => jumpToAnnotatedEvent(1))
@@ -947,8 +946,7 @@ document.querySelector('#footer-play-event').addEventListener('click', async () 
 		let nextNth = Math.min(Math.max(renderInfo.middlewareIndex + 1, 0), renderInfo.request.events.length - 1)
 		if (nextNth === renderInfo.middlewareIndex) eventPlaying = false;
 		else {
-			renderInfo.middlewareIndex = nextNth
-			await renderMiddleware()
+			await changeMiddleware(nextNth);
 			await new Promise(r => setTimeout(r, animationDuration / 5))
 		}
 	}
