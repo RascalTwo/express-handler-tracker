@@ -1,4 +1,4 @@
-import { filepathPrefix, renderInfo, root, views } from "./globals.js";
+import { renderInfo, viewInfo } from "./globals.js";
 
 export function sourceLineToID(objects, fullSrc) {
 	let src = fullSrc.split(':')[0]
@@ -10,7 +10,7 @@ export function sourceLineToID(objects, fullSrc) {
 }
 
 export function generateViewName(name) {
-	const fullExt = views.extension.startsWith('.') ? views.extension : '.' + views.extension;
+	const fullExt = viewInfo.views.extension.startsWith('.') ? viewInfo.views.extension : '.' + viewInfo.views.extension;
 	return name + (name.endsWith(fullExt) ? '' : fullExt)
 }
 
@@ -23,19 +23,19 @@ const formatLocationSuffix = (root, line, column) => {
 export const generateURL = (root, path, lineNumber) => {
 	const filepath = path.includes(':') ? path.split(':').slice(0, -2).join(':') : path;
 	const [line, column] = path.includes(':') ? path.split(':').slice(-2) : [undefined, undefined];
-	const url = filepathPrefix + filepath + (lineNumber ? formatLocationSuffix(root, line, column) : '');
+	const url = viewInfo.filepathPrefix + filepath + (lineNumber ? formatLocationSuffix(root, line, column) : '');
 	return url
 }
 
 export function generateEventURLs(event, lineNumber = true) {
 	return {
-		added: event.handler?.add && generateURL(root, event.handler.add, lineNumber),
-		evaluated: event.evaluate?.line && generateURL(root, event.evaluate.line, lineNumber),
-		construct: event.handler?.construct && generateURL(root, event.handler.construct, lineNumber),
+		added: event.handler?.add && generateURL(viewInfo.root, event.handler.add, lineNumber),
+		evaluated: event.evaluate?.line && generateURL(viewInfo.root, event.evaluate.line, lineNumber),
+		construct: event.handler?.construct && generateURL(viewInfo.root, event.handler.construct, lineNumber),
 		source: event.handler?.location
-			? generateURL(root, `${event.handler.location.path}:${event.handler.location.line}:${event.handler.location.column}`, lineNumber)
-			: event.source && generateURL(root, event.source, lineNumber),
-		error: event.error?.line ? generateURL(root, event.error.line, lineNumber) : undefined,
+			? generateURL(viewInfo.root, `${event.handler.location.path}:${event.handler.location.line}:${event.handler.location.column}`, lineNumber)
+			: event.source && generateURL(viewInfo.root, event.source, lineNumber),
+		error: event.error?.line ? generateURL(viewInfo.root, event.error.line, lineNumber) : undefined,
 	}
 }
 
@@ -60,7 +60,7 @@ export function generateHighlightedCode(event, urls = generateEventURLs(event)){
 }
 
 export function generateEventCodeHTML(event, urls = generateEventURLs(event)) {
-	return generateHighlightedCode(event, urls).map(({ key, html }) => `${key[0].toUpperCase() + key.slice(1)} <a ${urls[key].includes('http') ? 'target="_blank"' : ''} href="${urls[key]}">${urls[key].replace(filepathPrefix, '')}</a><br/><code>${html}</code>`).join('<br/>');
+	return generateHighlightedCode(event, urls).map(({ key, html }) => `${key[0].toUpperCase() + key.slice(1)} <a ${urls[key].includes('http') ? 'target="_blank"' : ''} href="${urls[key]}">${urls[key].replace(viewInfo.filepathPrefix, '')}</a><br/><code>${html}</code>`).join('<br/>');
 }
 
 export function generateProxyCallLabel(event, content = '.'.repeat(event.args.count)) {
@@ -76,13 +76,13 @@ export function generateEventLabel(event) {
 	let label = 'Unknown';
 	if (event.type === 'middleware') {
 		if (event.handler.name === 'router') {
-			const constructFilename = event.handler.construct?.replace(filepathPrefix, '').split(':').slice(0, -2)
+			const constructFilename = event.handler.construct?.replace(viewInfo.filepathPrefix, '').split(':').slice(0, -2)
 			const routeAddedTo = (event.handler?.code?.add?.[1].match(/use\(('|"|`)(.*?)\1/i) || { 2: '' })[2]
 			label = [routeAddedTo && `"${routeAddedTo}"` || '', constructFilename].join(' ');
 		} else label = event.handler.name ? `${event.handler.name}()` : '<anonymous>'
 	}
 	else if (event.type === 'redirect') label = `Redirect to ${event.path}`
-	else if (event.type === 'view') label = views.directory + `/` + generateViewName(event.name)
+	else if (event.type === 'view') label = viewInfo.views.directory + `/` + generateViewName(event.name)
 	else if (event.type === 'send') label = 'response.send()'
 	else if (event.type === 'json') label = 'response.json()'
 	else if (event.type === 'proxy-evaluate') label = generateProxyCallLabel(event);

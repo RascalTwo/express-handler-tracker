@@ -14,7 +14,18 @@ export const requests = await (async () => {
 		return getLocalInfo()
 	});
 })();
-export const { modules, root, views, VERSION } = await (async () => {
+
+
+export const renderInfo = {
+	request: Object.values(requests)[0],
+	middlewareIndex: 0,
+	forward: true,
+	tip: undefined,
+	lastNode: undefined,
+	animating: false,
+}
+
+export const viewInfo = await (async () => {
 	const getLocalInfo = async () => {
 		const importing = JSON.parse(localStorage.getItem('importing-info') || '{}');
 		if (Object.keys(importing).length) return importing;
@@ -27,14 +38,5 @@ export const { modules, root, views, VERSION } = await (async () => {
 		return getLocalInfo()
 	});
 })();
-export const filepathPrefix = root.startsWith('http') ? root : 'vscode://file' + root
 
-
-export const renderInfo = {
-	request: Object.values(requests)[0],
-	middlewareIndex: 0,
-	forward: true,
-	tip: undefined,
-	lastNode: undefined,
-	animating: false,
-}
+viewInfo.filepathPrefix = viewInfo.root.startsWith('http') ? viewInfo.root : 'vscode://file' + viewInfo.root

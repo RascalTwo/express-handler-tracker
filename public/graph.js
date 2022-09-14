@@ -8,7 +8,7 @@ import { animationDuration } from './animation-duration.js';
 
 import './theme.js';
 
-import { modules, root, views, requests, renderInfo, VERSION, isOffline, filepathPrefix } from './globals.js'
+import { requests, renderInfo, viewInfo, isOffline } from './globals.js'
 import { generateLinkedSVG } from './svg.js';
 
 marked.setOptions({
@@ -68,7 +68,7 @@ if (!isOffline) setupEventSource(requests, () => {
 
 function generateElements() {
 	const parents = {};
-	const elements = modules.map(mod => {
+	const elements = viewInfo.modules.map(mod => {
 		const parentNames = mod.source.split('/').slice(0, -1).reverse()
 		for (let i = 0; i < parentNames.length; i++) {
 			const current = parentNames[i];
@@ -77,11 +77,11 @@ function generateElements() {
 		}
 		const label = mod.source.split('/').at(-1)
 		return {
-			data: { id: mod.source, parent: compoundNodes ? parentNames[0] : undefined, label, baseLabel: label, href: generateURL(root, mod.source) },
+			data: { id: mod.source, parent: compoundNodes ? parentNames[0] : undefined, label, baseLabel: label, href: generateURL(viewInfo.root, mod.source) },
 			classes: parentNames[0] ? 'parent-' + parentNames[0] : undefined
 		}
 	})
-	for (const mod of modules) {
+	for (const mod of viewInfo.modules) {
 		for (const dep of mod.dependencies) {
 			elements.push({
 				data: {
@@ -99,10 +99,10 @@ function generateElements() {
 			if (event.type === 'view') {
 				const caller = event.evaluate.line && sourceLineToID(elements, event.evaluate.line)
 				const label = generateViewName(event.name)
-				const id = views.directory + '/' + label
+				const id = viewInfo.views.directory + '/' + label
 				foundViews[event.name] = {
-					data: { id, label, baseLabel: label, parent: compoundNodes && views.directory },
-					classes: 'parent-' + views.directory
+					data: { id, label, baseLabel: label, parent: compoundNodes && viewInfo.views.directory },
+					classes: 'parent-' + viewInfo.views.directory
 				}
 				if (caller) {
 					elements.push({ data: { id: `${caller.data.id}-${id}`, source: caller.data.id, target: id, arrow: 'triangle' }, classes: 'group' })
@@ -112,7 +112,7 @@ function generateElements() {
 	}
 	if (Object.values(foundViews).length) {
 		elements.push(...Object.values(foundViews))
-		if (compoundNodes) elements.push({ data: { id: views.directory, label: views.directory }, classes: `parent-${views.directory} group` })
+		if (compoundNodes) elements.push({ data: { id: viewInfo.views.directory, label: viewInfo.views.directory }, classes: `parent-${viewInfo.views.directory} group` })
 	}
 	if (compoundNodes) elements.push(...Object.values(parents))
 	return elements;
@@ -194,7 +194,7 @@ function renderBubbles() {
 	const ids = new Set();
 	for (const event of renderInfo.request.events) {
 		const urls = generateEventURLs(event)
-		const remaining = [...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse(), ...(event.type === 'view' ? [views.directory + '/' + generateViewName(event.name)] : [])];
+		const remaining = [...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse(), ...(event.type === 'view' ? [viewInfo.views.directory + '/' + generateViewName(event.name)] : [])];
 
 		for (const url of remaining) {
 			const target = sourceLineToID(Object.values(cy.elements()).map(cye => {
@@ -313,7 +313,7 @@ function generateEventNodes(event, forward) {
 	const nodes = [];
 
 	const urls = generateEventURLs(event, false)
-	const remaining = [...(event.type === 'view' ? [views.directory + '/' + generateViewName(event.name)] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.replace(filepathPrefix, '')).reverse()];
+	const remaining = [...(event.type === 'view' ? [viewInfo.views.directory + '/' + generateViewName(event.name)] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.replace(viewInfo.filepathPrefix, '')).reverse()];
 	if (!forward) remaining.reverse();
 
 	while (remaining.length) {
@@ -510,7 +510,7 @@ async function renderMiddleware() {
 	);
 
 	const urls = generateEventURLs(event)
-	const remaining = [...(event.type === 'view' ? [views.directory + '/' + generateViewName(event.name)] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse()];
+	const remaining = [...(event.type === 'view' ? [viewInfo.views.directory + '/' + generateViewName(event.name)] : []), ...'added evaluated construct source error'.split` `.map(key => urls[key]).filter(Boolean).map(u => u.split('//').at(-1)).reverse()];
 	if (!renderInfo.forward) remaining.reverse()
 
 	const w5 = document.querySelector('#window5 pre')
@@ -1044,7 +1044,7 @@ document.querySelector('#save-as-svg').addEventListener('click', () => {
 		full: true
 	})
 	svgWindow.document.body.innerHTML = rawSVG;
-	svgWindow.document.body.innerHTML = generateLinkedSVG(svgWindow.document.body.children[0], document.querySelector('#root-input').value || root);
+	svgWindow.document.body.innerHTML = generateLinkedSVG(svgWindow.document.body.children[0], document.querySelector('#root-input').value || viewInfo.root);
 
 	const linkedSVG = svgWindow.document.body.innerHTML;
 
@@ -1140,7 +1140,7 @@ const openJSONEditorModal = (() => {
 
 	function getData() {
 		const data = {
-			version: VERSION,
+			version: viewInfo.VERSION,
 			paths: {
 				root: document.querySelector('#root-input').value,
 				views: {
@@ -1219,9 +1219,9 @@ const openJSONEditorModal = (() => {
 		modal.reset()
 
 
-		document.querySelector('#root-input').value = root;
-		document.querySelector('#views-directory-input').value = views.directory;
-		document.querySelector('#views-extension-input').value = views.extension;
+		document.querySelector('#root-input').value = viewInfo.root;
+		document.querySelector('#views-directory-input').value = viewInfo.views.directory;
+		document.querySelector('#views-extension-input').value = viewInfo.views.extension;
 
 		const datalist = document.querySelector('#export-data-datalist')
 		datalist.innerHTML = '';
@@ -1277,8 +1277,8 @@ const openJSONEditorModal = (() => {
 			renderRequest();
 		}
 		if (graph) {
-			modules.splice(0, modules.length)
-			modules.push(...graph.modules)
+			viewInfo.modules.splice(0, viewInfo.modules.length)
+			viewInfo.modules.push(...graph.viewInfo.modules)
 			cy.json({ elements: generateElements() })
 			for (const [id, { x, y }] of Object.entries(graph.positions).sort((a, b) => a[0].split('/').length - b[0].split('/').length)) {
 				cy.$(`[id="${id}"]`)?.position({ x, y })
@@ -1306,6 +1306,9 @@ const openJSONEditorModal = (() => {
 			VERSION,
 			modules: graph?.modules || []
 		}))
+		viewInfo.root = paths.root;
+		viewInfo.views = paths.views;
+		if (graph?.modules) viewInfo.modules = graph.modules;
 		renderStyleRules();
 		updateStyles();
 	})
