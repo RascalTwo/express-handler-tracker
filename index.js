@@ -267,7 +267,7 @@ const returnHandler = (method, handler) => args => {
 		else if (method === 'param') ret = handler(request, response, nextAfter, paramValue);
 		else ret = handler(error, request, response, nextAfter);
 
-		if (ret && typeof ret.then === 'function') return ret.then(() => nextAfter(undefined, () => undefined), err => nextAfter(err, next));
+		if (ret && typeof ret.then === 'function') return ret.then(() => nextAfter?.(undefined, () => undefined), err => nextAfter?.(err, next));
 
 		response.__r2_sync_finishes = [...(response.__r2_sync_finishes || []), finishHandler]
 		setTimeout(finishHandler, MIDDLEWARE_WAIT_TIME);
