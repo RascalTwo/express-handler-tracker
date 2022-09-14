@@ -1,7 +1,7 @@
 import { viewInfo } from "./globals.js";
 import { importData } from "./helpers.js";
 
-const BACKEND_URL = 'http://localhost:3030/';
+const BACKEND_URL = 'https://r2-eht-backend.herokuapp.com/';
 
 let token = localStorage.getItem('backend-token')
 
@@ -12,8 +12,8 @@ const params = {
 	...Object.fromEntries(hashParams.entries())
 }
 
-if (params.has('token')) {
-	token = params.get('token')
+if ('token' in params) {
+	token = params['token']
 	localStorage.setItem('backend-token', token)
 
 	if (searchParams.has('token')) {
