@@ -14,11 +14,28 @@ import { generateLinkedSVG } from './svg.js';
 import './backend.js'
 import { selfId, upsertData } from './backend.js';
 
+import * as API from './api.js';
+
 marked.setOptions({
 	highlight(code, language){
-		return hljs.highlight(code, { language }).value
+		try {
+			return hljs.highlight(code, { language }).value
+		} catch (e) {
+			return code
+		}
 	}
 })
+
+const markedRenderer = new marked.Renderer();
+
+markedRenderer.link = function(href, title, text) {
+	const anchor = document.createElement('a');
+	anchor.target = '_blank'
+	anchor.href = href;
+	anchor.title = title;
+	anchor.textContent = text;
+	return anchor.outerHTML;
+}
 
 let compoundNodes = document.querySelector('#groups').checked
 document.querySelector('#groups').addEventListener('change', e => {
@@ -195,7 +212,7 @@ function updateWindowHTML(window, body, title, ...buttons) {
 			content.innerHTML = jsondiffpatch.formatters.html.format(body.data.delta, body.data.original)
 			jsondiffpatch.formatters.html.hideUnchanged();
 		} else if (body.type === 'markdown'){
-			content.innerHTML = marked.parse(body.string);
+			content.innerHTML = marked.parse(body.string, { renderer: markedRenderer });
 		} else {
 			let pre = content.querySelector(':scope > pre');
 			if (!pre) {
@@ -292,7 +309,7 @@ function generateEventTooltipContent(event, urls){
 	if (event.annotation){
 		const annotationContent = event.annotation.split('[//]: # (Start Annotation)').at(1)?.split('[//]: # (End Annotation)')[0].trim()
 		if (annotationContent) {
-			content.innerHTML += marked.parse(annotationContent)
+			content.innerHTML += marked.parse(annotationContent, { renderer: markedRenderer })
 		}
 	}
 
@@ -318,6 +335,7 @@ let annotationPlaying = false;
 
 document.querySelector('#footer-prev-annotation').addEventListener('click', () => jumpToAnnotatedEvent(-1))
 document.querySelector('#footer-pause-annotation').addEventListener('click', () => {
+	allPlaying = false;
 	annotationPlaying = false;
 })
 document.querySelector('#footer-play-annotation').addEventListener('click', async () => {
@@ -349,7 +367,16 @@ async function renderMiddleware() {
 	if (event.diffs) {
 		for (const [i, key] of ['request', 'response'].entries()){
 			if (!event.diffs[key]) {
-				renderWindow(i + 1, { title: key[0].toUpperCase() + key.slice(1), body: '' });
+				renderWindow(
+					i + 1,
+					{ title: key[0].toUpperCase() + key.slice(1), body: '' },
+					editJSONButton(() => ({}), (_, newJSON) => {
+						if (newJSON) event.diffs[key] = newJSON
+						else delete event.diffs[key]
+						renderMiddleware();
+						updateEvent(renderInfo.request.id, event.start, { diffs: event.diffs })
+					})
+				);
 				continue;
 			}
 			let original
@@ -365,7 +392,8 @@ async function renderMiddleware() {
 				i + 1,
 				{ title: key[0].toUpperCase() + key.slice(1), body: { type: 'diff', data: { original, delta: event.diffs[key] } } },
 				editJSONButton(() => event.diffs[key], (_, newJSON) => {
-					event.diffs[key] = newJSON
+					if (newJSON) event.diffs[key] = newJSON
+					else delete event.diffs[key]
 					renderMiddleware();
 					updateEvent(renderInfo.request.id, event.start, { diffs: event.diffs })
 				})
@@ -380,7 +408,8 @@ async function renderMiddleware() {
 			2,
 			{ title: event.name + ' view', body: { type: 'code', string: event.locals ? JSON.stringify(event.locals, undefined, '  ') : '{}' } },
 			editJSONButton(() => event.locals, (_, newLocals) => {
-				event.locals = newLocals;
+				if (newLocals) event.locals = newLocals;
+				else delete event.locals
 				renderMiddleware()
 				updateEvent(renderInfo.request.id, event.start, { locals: event.locals })
 			})
@@ -403,9 +432,10 @@ async function renderMiddleware() {
 		renderWindow(1, { body: '' })
 		renderWindow(
 			2,
-			{ title: 'Response JSON', body: { type: 'code', string: JSON.stringify(event.json, undefined, '  ') } },
+			{ title: 'Response JSON', body: { type: 'code', string: event.json ? JSON.stringify(event.json, undefined, '  ') : '' } },
 			editJSONButton(() => event.json, (_, newJSON) => {
-				event.json = newJSON
+				if (event.json) event.json = newJSON
+				else delete event.json
 				renderMiddleware()
 				updateEvent(renderInfo.request.id, event.start, { json: event.json })
 			})
@@ -587,7 +617,7 @@ function deleteRequest(id){
 	renderMiddlewaresSelect()
 	renderRequest()
 	renderMiddleware()
-	fetch('./delete-request/' + request.id).catch(console.error);
+	API.deleteRequest(request.id)
 }
 
 document.querySelector('#delete-request').addEventListener('click', () => {
@@ -602,16 +632,16 @@ document.querySelector('#delete-event').addEventListener('click', () => {
 	document.querySelector('#events').value = request.events[renderInfo.middlewareIndex].start
 	renderMiddlewaresSelect()
 	renderMiddleware()
-	fetch('./delete-event/' + request.id + '/' + event.start, { method: 'DELETE' }).catch(console.error);
+	return API.deleteEvent(request.id, event.start)
 })
 
 
-function changeMiddleware(nth) {
+async function changeMiddleware(nth) {
 	if (renderInfo.animating) return false
 	let oldNth = renderInfo.middlewareIndex;
 	renderInfo.middlewareIndex = nth;
 	renderInfo.forward = renderInfo.middlewareIndex > oldNth;
-	renderMiddleware();
+	await renderMiddleware();
 
 	document.querySelector('#events').selectedOptions[0]?.scrollIntoView({ behavior: 'smooth', block: 'center' })
 	return true;
@@ -770,14 +800,6 @@ function renderCodeTooltips() {
 				nodeInfos[node.data.id].infos.push(o)
 			}
 		}
-		// vscode://file/home/rascal_two/Desktop/Code/Unknown/GitHub/PairwiseSorter/server.js:26:5
-		// to filename
-
-		/*let nextHTML = generateEventCodeHTML(e);
-
-		if (nextHTML === lastHTML || lastHTML.includes(nextHTML)) nextHTML = 'SAME'
-		if (nextHTML !== 'SAME') lastHTML = nextHTML
-		w6.innerHTML += `<details open data-event-id="${e.start}"><summary>${generateEventLabel(e)} <button>Render</button></summary>${nextHTML === 'SAME' ? i ? 'Same as previous' : '' : nextHTML}</details>`*/
 	}
 
 	for (const [nid, { i, infos }] of Object.entries(nodeInfos)){
@@ -937,30 +959,48 @@ window.addEventListener('keydown', ({ target, key }) => {
 });
 let eventPlaying = false;
 document.querySelector('#footer-pause-event').addEventListener('click', () => {
+	allPlaying = false;
 	eventPlaying = false;
 })
-document.querySelector('#footer-play-event').addEventListener('click', async () => {
-	if (eventPlaying) return;
+
+async function playHandlers(){
 	eventPlaying = true;
 	while (eventPlaying){
 		let nextNth = Math.min(Math.max(renderInfo.middlewareIndex + 1, 0), renderInfo.request.events.length - 1)
 		if (nextNth === renderInfo.middlewareIndex) eventPlaying = false;
 		else {
 			await changeMiddleware(nextNth);
-			await new Promise(r => setTimeout(r, animationDuration / 5))
+			await new Promise(r => setTimeout(r, animationDuration))
 		}
 	}
+}
+document.querySelector('#footer-play-event').addEventListener('click', () => {
+	if (!eventPlaying) playHandlers()
 })
 document.querySelector('#footer-prev-event').addEventListener('click', () => changeMiddleware(Math.min(Math.max(renderInfo.middlewareIndex - 1, 0), renderInfo.request.events.length - 1)))
 
 document.querySelector('#footer-next-event').addEventListener('click', () => changeMiddleware(Math.min(Math.max(renderInfo.middlewareIndex + 1, 0), renderInfo.request.events.length - 1)))
 
+let allPlaying = false;
+document.querySelector('#play-requests').addEventListener('click', async () => {
+	allPlaying = true
+	for (let requestIndex = Object.keys(requests).indexOf('' + renderInfo.request.id); allPlaying && Object.values(requests)[requestIndex]; requestIndex++) {
+		renderInfo.request = Object.values(requests)[requestIndex];
+		renderRequest()
+		await new Promise(r => setTimeout(r, animationDuration * 2))
+		requestSelect.scrollIntoView({ behavior: 'smooth', block: 'start' })
+		await new Promise(r => setTimeout(r, animationDuration * 2))
+		await playHandlers()
+		await new Promise(r => setTimeout(r, animationDuration * 2))
+	}
+})
+
 function updateRequestInfo(request, updates){
-	fetch('./update-request/' + request.id, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+	API.updateRequest(request.id, updates)
 }
 
 function updateEvent(requestId, eventStart, updates) {
-	fetch('./update-event/' + requestId + '/' + eventStart, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(updates) });
+	API.updateEvent(requestId, eventStart, updates)
 }
 
 function downloadBlob(blob, filename){
@@ -1051,8 +1091,16 @@ const openJSONEditorModal = (() => {
 	modal.addEventListener('submit', e => {
 		e.preventDefault()
 
-		info.submitJSON(info.getInitialJSON(), editor.get());
-		checkbox.checked = false;
+		try {
+			info.submitJSON(info.getInitialJSON(), editor.get());
+			checkbox.checked = false;
+		} catch(e) {
+			console.error(e)
+			if (!editor.getText() && confirm('Delete JSON entirely?')) {
+				info.submitJSON(info.getInitialJSON(), null);
+				checkbox.checked = false;
+			}
+		}
 	})
 
 	return openJSONEditorModal;
