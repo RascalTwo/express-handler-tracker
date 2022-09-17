@@ -18,11 +18,11 @@ if ('token' in params) {
 
 	if (searchParams.has('token')) {
 		searchParams.delete('token')
-		window.location.search = params.toString() ? '?' + params.toString() : ''
+		window.location.search = searchParams.toString() ? '?' + searchParams.toString() : ''
 	}
 	else {
 		hashParams.delete('token')
-		window.location.hash = params.toString() ? '#' + params.toString() : ''
+		window.location.hash = hashParams.toString() ? '#' + hashParams.toString() : ''
 	}
 }
 
