@@ -391,11 +391,24 @@ async function renderMiddleware() {
 			renderWindow(
 				i + 1,
 				{ title: key[0].toUpperCase() + key.slice(1), body: { type: 'diff', data: { original, delta: event.diffs[key] } } },
-				editJSONButton(() => event.diffs[key], (_, newJSON) => {
+				editJSONButton(() => event.diffs[key], async (oldJSON, newJSON) => {
+					if (document.querySelector('#jsonEditorUpdateSimilar').checked){
+						const diffDiff = jsondiffpatch.diff(oldJSON, newJSON)
+						const currentLabel = generateEventLabel(event, false)
+						for (const otherRequest of Object.values(requests)){
+							for (const otherEvent of otherRequest.events){
+								if (generateEventLabel(otherEvent, false) === currentLabel){
+									if (newJSON) jsondiffpatch.patch(otherEvent.diffs[key], diffDiff)
+									else delete otherEvent.diffs[key]
+									await updateEvent(otherRequest.id, otherEvent.start, { diffs: otherEvent.diffs })
+								}
+							}
+						}
+					}
 					if (newJSON) event.diffs[key] = newJSON
 					else delete event.diffs[key]
-					renderMiddleware();
-					updateEvent(renderInfo.request.id, event.start, { diffs: event.diffs })
+					await renderMiddleware();
+					await updateEvent(renderInfo.request.id, event.start, { diffs: event.diffs })
 				})
 			);
 		}
@@ -407,11 +420,24 @@ async function renderMiddleware() {
 		renderWindow(
 			2,
 			{ title: event.name + ' view', body: { type: 'code', string: event.locals ? JSON.stringify(event.locals, undefined, '  ') : '{}' } },
-			editJSONButton(() => event.locals, (_, newLocals) => {
-				if (newLocals) event.locals = newLocals;
+			editJSONButton(() => event.locals, async (oldLocals, newLocals) => {
+				if (document.querySelector('#jsonEditorUpdateSimilar').checked){
+					const diffDiff = jsondiffpatch.diff(oldLocals, newLocals)
+					const currentLabel = generateEventLabel(event, false)
+					for (const otherRequest of Object.values(requests)){
+						for (const otherEvent of otherRequest.events){
+							if (generateEventLabel(otherEvent, false) === currentLabel){
+								if (newLocals) jsondiffpatch.patch(otherEvent.locals, diffDiff)
+								else delete otherEvent.locals
+								await updateEvent(otherRequest.id, otherEvent.start, { locals: otherEvent.locals })
+							}
+						}
+					}
+				}
+				if (newLocals) event.locals = newLocals
 				else delete event.locals
-				renderMiddleware()
-				updateEvent(renderInfo.request.id, event.start, { locals: event.locals })
+				await renderMiddleware()
+				await updateEvent(renderInfo.request.id, event.start, { locals: event.locals })
 			})
 		);
 	} else if (event.type === 'send') {
@@ -433,11 +459,24 @@ async function renderMiddleware() {
 		renderWindow(
 			2,
 			{ title: 'Response JSON', body: { type: 'code', string: event.json ? JSON.stringify(event.json, undefined, '  ') : '' } },
-			editJSONButton(() => event.json, (_, newJSON) => {
-				if (event.json) event.json = newJSON
+			editJSONButton(() => event.json, async (oldJSON, newJSON) => {
+				if (document.querySelector('#jsonEditorUpdateSimilar').checked){
+					const diffDiff = jsondiffpatch.diff(oldJSON, newJSON)
+					const currentLabel = generateEventLabel(event, false)
+					for (const otherRequest of Object.values(requests)){
+						for (const otherEvent of otherRequest.events){
+							if (generateEventLabel(otherEvent, false) === currentLabel){
+								if (newJSON) jsondiffpatch.patch(otherEvent.json, diffDiff)
+								else delete otherEvent.json
+								await updateEvent(otherRequest.id, otherEvent.start, { json: otherEvent.json })
+							}
+						}
+					}
+				}
+				if (newJSON) event.json = newJSON
 				else delete event.json
-				renderMiddleware()
-				updateEvent(renderInfo.request.id, event.start, { json: event.json })
+				await renderMiddleware()
+				await updateEvent(renderInfo.request.id, event.start, { json: event.json })
 			})
 		);
 	} else if (event.type === 'proxy-evaluate') {
@@ -996,11 +1035,11 @@ document.querySelector('#play-requests').addEventListener('click', async () => {
 })
 
 function updateRequestInfo(request, updates){
-	API.updateRequest(request.id, updates)
+	return API.updateRequest(request.id, updates)
 }
 
 function updateEvent(requestId, eventStart, updates) {
-	API.updateEvent(requestId, eventStart, updates)
+	return API.updateEvent(requestId, eventStart, updates)
 }
 
 function downloadBlob(blob, filename){
@@ -1086,6 +1125,7 @@ const openJSONEditorModal = (() => {
 		Object.assign(info, { getInitialJSON, submitJSON })
 		editor.set(getInitialJSON())
 		checkbox.checked = true;
+		modal.querySelector('#jsonEditorUpdateSimilar').checked = false
 	}
 
 	modal.addEventListener('submit', e => {
