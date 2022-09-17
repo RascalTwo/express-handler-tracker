@@ -526,6 +526,41 @@ async function renderMiddleware() {
 			}, 'Set Annotation Markdown', 'Set')
 		},
 		{
+			innerHTML: 'Edit All',
+			onclick: () => openTextModal(() => renderInfo.request.events.map(event => `[//]: # (Start Event "${event.start}" aka "${generateEventLabel(event).trim()}")\n\n${event.annotation || ''}\n\n`).join('\n'), async (oldAnnotation, newAnnotation) => {
+				if (!newAnnotation) {
+					for (const event of renderInfo.request.events){
+						if (!event.annotation) continue;
+						delete event.annotation
+						await updateEvent(renderInfo.request.id, event.start, { annotation: undefined });
+					}
+					delete event.annotation
+				} else {
+					const updated = new Set();
+					for (const { start, content } of newAnnotation.split('[//]: # (Start Event "').slice(1).map(part => ({
+						start: part.split('"')[0],
+						content: part.split('")\n').slice(1).join('")\n').trim() || undefined
+					}))) {
+						const event = renderInfo.request.events.find(e => e.start == start)
+						if (!event) {
+							console.error(`Event not found for annotating: ${start}`)
+							continue
+						}
+						updated.add(start);
+						if (event.annotation === content) continue;
+						await updateEvent(renderInfo.request.id, event.start, { annotation: content });
+						event.annotation = content;
+					}
+					for (const start of oldAnnotation.split('[//]: # (Start Event "').slice(1).map(part => part.split('"')[0])) {
+						if (updated.has(start)) continue;
+						await updateEvent(renderInfo.request.id, event.start, { annotation: undefined });
+						delete event.annotation
+					}
+				}
+				await renderMiddleware();
+			}, 'Set All Annotations', 'Set')
+		},
+		{
 			innerHTML: 'Next',
 			onclick: () => jumpToAnnotatedEvent(1)
 		}
