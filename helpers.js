@@ -72,7 +72,7 @@ export function generateProxyCallLabel(event, content = '.'.repeat(event.args.co
 			: `${event.label}.${event.property}(${content})${suffix}`;
 }
 
-export function generateEventLabel(event) {
+export function generateEventLabel(event, ms = true) {
 	let label = 'Unknown';
 	if (event.type === 'middleware') {
 		if (event.handler.name === 'router') {
@@ -86,10 +86,10 @@ export function generateEventLabel(event) {
 	else if (event.type === 'send') label = 'response.send()'
 	else if (event.type === 'json') label = 'response.json()'
 	else if (event.type === 'proxy-evaluate') label = generateProxyCallLabel(event);
-	if (event.end && event.start) label += ' - ' + (event.end - event.start).toFixed(2) + 'ms';
+	if (ms && event.end && event.start) label += ' - ' + (event.end - event.start).toFixed(2) + 'ms';
 
 	if (event.type === 'start') label = `Started\n`
-	if (event.type === 'finish') label = `Finished in ${(event.end - renderInfo.request.id).toFixed(2)} ms`
+	if (event.type === 'finish') label = 'Finished' + (ms ? ` in ${(event.end - renderInfo.request.id).toFixed(2)} ms` : '')
 
 	return label
 }
