@@ -1268,6 +1268,7 @@ const openJSONEditorModal = (() => {
 
 	document.querySelector('#export-data-button').addEventListener('click', () => {
 		checkbox.checked = true;
+		document.querySelector('#button3').click()
 
 		modal.reset()
 
