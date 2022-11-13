@@ -75,7 +75,7 @@ function getGithubInfoFromUsername(username){
 
 
 
-export const selfId = await makeBackendFetch('').then(u => u?._id)
+export const selfId = await makeBackendFetch('self').then(u => u?._id)
 export const selfInfo = selfId ? await getGithubInfo(selfId) : null;
 
 if (selfInfo) document.querySelector('#auth-button img').src = selfInfo.avatar_url
