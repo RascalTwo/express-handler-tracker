@@ -1,7 +1,7 @@
 import { viewInfo } from "./globals.js";
 import { importData } from "./helpers.js";
 
-const BACKEND_URL = 'https://r2-eht-backend.herokuapp.com/';
+const BACKEND_URL = 'https://express-handler-tracker-backend.onrender.com/';
 
 let token = localStorage.getItem('backend-token')
 
